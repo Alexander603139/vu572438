@@ -1,2 +1,0 @@
-#!/bin/bash
-GIT_WORK_TREE=/opt/ai-agent git checkout -f
