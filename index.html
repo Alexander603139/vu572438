@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Политический классификатор</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial; max-width: 1000px; margin: 50px auto; padding: 20px; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tab button { background-color: inherit; float: left; border: none; outline: none; cursor: pointer; padding: 10px 20px; transition: 0.3s; font-size: 16px; }
+        .tab button:hover { background-color: #ddd; }
+        .tab button.active { background-color: #007bff; color: white; }
+        .tabcontent { display: none; }
+        textarea { width: 100%; height: 150px; padding: 10px; }
+        input[type="number"] { width: 80px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 10px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: top; }
+        th { background-color: #f2f2f2; }
+        .error { color: red; }
+        .article-preview { font-size: 12px; color: #555; margin-top: 5px; }
+        details { margin-bottom: 10px; }
+        summary { cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h1>Политический классификатор текста и новостных сайтов</h1>
+
+<div class="tab">
+    <button class="tablinks" onclick="openTab(event, 'Single')" id="defaultOpen">Анализ одного текста</button>
+    <button class="tablinks" onclick="openTab(event, 'Sites')">Анализ сайтов</button>
+</div>
+
+<!-- Режим 1: один текст -->
+<div id="Single" class="tabcontent">
+    <h3>Введите текст для анализа</h3>
+    <textarea id="singleText" placeholder="Вставьте текст новости или статьи..."></textarea>
+    <br>
+    <button onclick="analyzeSingle()">Анализировать</button>
+    <div id="singleResult" style="margin-top: 20px;"></div>
+</div>
+
+<!-- Режим 2: список сайтов -->
+<div id="Sites" class="tabcontent">
+    <h3>Введите список URL (по одному на строку)</h3>
+    <textarea id="urls" placeholder="https://ria.ru&#10;https://meduza.io&#10;https://tass.ru"></textarea>
+    <br>
+    <label>Максимум статей на сайт: <input type="number" id="maxArticles" value="5" min="1" max="10"></label>
+    <br>
+    <button onclick="analyzeSites()">Анализировать сайты</button>
+    <div id="sitesResult" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+    document.getElementById("defaultOpen").click();
+
+    async function analyzeSingle() {
+        const text = document.getElementById('singleText').value;
+        if (!text) return;
+        document.getElementById('singleResult').innerHTML = 'Анализ...';
+        try {
+            const response = await fetch('http://186.246.14.209:8000/classify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await response.json();
+            document.getElementById('singleResult').innerHTML = `<pre>${data.result}</pre>`;
+        } catch (error) {
+            document.getElementById('singleResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+        }
+    }
+
+    async function analyzeSites() {
+        const urlsText = document.getElementById('urls').value;
+        const urls = urlsText.split('\n').filter(u => u.trim().length > 0);
+        const maxArticles = parseInt(document.getElementById('maxArticles').value);
+        if (urls.length === 0) return;
+        document.getElementById('sitesResult').innerHTML = 'Анализ выполняется... (может занять несколько минут)';
+        try {
+            const response = await fetch('http://186.246.14.209:8000/analyze_sites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls: urls, max_articles_per_site: maxArticles })
+            });
+            const data = await response.json();
+            let html = '<h3>Результаты по сайтам</h3>';
+            for (const item of data.results) {
+                if (item.error) {
+                    html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
+                    continue;
+                }
+                html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed})</summary>`;
+                html += '<table><tr><th>Категория</th><th>%</th></tr>';
+                for (const [cat, perc] of Object.entries(item.distribution)) {
+                    html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
+                }
+                html += '</table>';
+                html += '<h4>Статьи:</h4><ul>';
+                for (const art of item.articles) {
+                    html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
+                    html += `<span class="article-preview">Превью: ${art.preview}</span><br>`;
+                    html += `Распределение: `;
+                    for (const [cat, perc] of Object.entries(art.distribution)) {
+                        html += `${cat} ${perc}%; `;
+                    }
+                    html += `</li>`;
+                }
+                html += `</ul></details><hr>`;
+            }
+            document.getElementById('sitesResult').innerHTML = html;
+        } catch (error) {
+            document.getElementById('sitesResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+        }
+    }
+</script>
+</body>
+</html>
