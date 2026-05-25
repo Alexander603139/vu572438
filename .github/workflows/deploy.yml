@@ -1,39 +1,37 @@
 name: Deploy to Timeweb
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      # Шаг 1: Проверяем код из репозитория
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: Copy files via SSH
-        uses: appleboy/scp-action@v0.1.8
+      # Шаг 2: Копируем файлы на сервер
+      - name: Copy files via SCP
+        uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
           username: root
           key: ${{ secrets.TIMEWEB_SSH_KEY }}
           source: "."
           target: "/opt/ai-agent"
-          strip_components: 0
           overwrite: true
 
+      # Шаг 3: Подключаемся к серверу и перезапускаем контейнеры
       - name: Restart Docker containers
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
           username: root
           key: ${{ secrets.TIMEWEB_SSH_KEY }}
           script: |
             cd /opt/ai-agent
-            docker-compose down
-            docker-compose pull --ignore-pull-failures
+            docker-compose pull
             docker-compose up -d --build
-            docker system prune -f
+            docker image prune -f
