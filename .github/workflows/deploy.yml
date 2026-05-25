@@ -2,7 +2,7 @@ name: Deploy to Timeweb
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  
+
 on:
   push:
     branches: [ main ]
@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Copy files via SSH
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v0.1.8
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
           username: root
@@ -26,7 +26,7 @@ jobs:
           overwrite: true
 
       - name: Restart Docker containers
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.TIMEWEB_HOST }}
           username: root
