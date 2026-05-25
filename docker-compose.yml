@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ai-agent-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./political_markers.yml:/app/political_markers.yml:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: ai-agent-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
