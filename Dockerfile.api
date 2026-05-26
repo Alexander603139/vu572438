@@ -19,6 +19,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api.py classifier.py political_markers.yml ./
+RUN pip install --upgrade pip 
 
 EXPOSE 8000
 
