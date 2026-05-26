@@ -11,6 +11,7 @@ services:
       - "8000:8000"
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro
+      - ./political_markers.yml:/opt/ai-agent/political_markers.yml:ro
     logging:
       driver: "json-file"
       options:
