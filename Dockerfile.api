@@ -1,9 +1,13 @@
 FROM python:3.10-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
 WORKDIR /app
 
 # Установка системных зависимостей для newspaper3k
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata \
     curl \
     libjpeg-dev \
     zlib1g-dev \
