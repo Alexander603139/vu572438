@@ -78,7 +78,13 @@
                 body: JSON.stringify({ text: text })
             });
             const data = await response.json();
-            document.getElementById('singleResult').innerHTML = `<pre>${data.result}</pre>`;
+            const resultDiv = document.getElementById('singleResult');
+            resultDiv.innerHTML = ''; // Очищаем контейнер
+
+            const preElement = document.createElement('pre');
+            // textContent автоматически экранирует спецсимволы <, >, & и т.д.
+            preElement.textContent = data.result;
+            resultDiv.appendChild(preElement);
         } catch (error) {
             document.getElementById('singleResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
         }
