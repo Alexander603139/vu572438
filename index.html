@@ -12,7 +12,7 @@
         .tabcontent { display: none; }
         textarea { width: 100%; height: 150px; padding: 10px; }
         input[type="number"] { width: 80px; }
-        button { padding: 10px 20px; background: rgb(128, 128, 244); color: white; border: none; cursor: pointer; margin-top: 10px; }
+        button { padding: 10px 20px; background: blue; color: white; border: none; cursor: pointer; margin-top: 10px; }
         table { border-collapse: collapse; width: 100%; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: top; }
         th { background-color: #f2f2f2; }
@@ -67,28 +67,71 @@
     }
     document.getElementById("defaultOpen").click();
 
-    async function analyzeSingle() {
-        const text = document.getElementById('singleText').value;
-        if (!text) return;
-        document.getElementById('singleResult').innerHTML = 'Анализ...';
-        try {
-            const response = await fetch('http://186.246.14.209:8000/classify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text })
-            });
-            const data = await response.json();
-            const resultDiv = document.getElementById('singleResult');
-            resultDiv.innerHTML = ''; // Очищаем контейнер
+    // async function analyzeSingle() {
+    //     const text = document.getElementById('singleText').value;
+    //     if (!text) return;
+    //     document.getElementById('singleResult').innerHTML = 'Анализ...';
+    //     try {
+    //         const response = await fetch('http://186.246.14.209:8000/classify', {
+    //             method: 'POST',
+    //             headers: { 'Content-Type': 'application/json' },
+    //             body: JSON.stringify({ text: text })
+    //         });
+    //         const data = await response.json();
+    //         const resultDiv = document.getElementById('singleResult');
+    //         resultDiv.innerHTML = ''; // Очищаем контейнер
 
-            const preElement = document.createElement('pre');
-            // textContent автоматически экранирует спецсимволы <, >, & и т.д.
-            preElement.textContent = data.result;
-            resultDiv.appendChild(preElement);
-        } catch (error) {
-            document.getElementById('singleResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
-        }
+    //         const preElement = document.createElement('pre');
+    //         // textContent автоматически экранирует спецсимволы <, >, & и т.д.
+    //         preElement.textContent = data.result;
+    //         resultDiv.appendChild(preElement);
+    //     } catch (error) {
+    //         document.getElementById('singleResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    //     }
+    // }
+
+async function analyzeSingle() {
+    const text = document.getElementById('singleText').value;
+    if (!text.trim()) {
+        document.getElementById('singleResult').innerHTML = '<span class="error">Введите текст для анализа</span>';
+        return;
     }
+
+    const resultDiv = document.getElementById('singleResult');
+    resultDiv.innerHTML = 'Анализ...';
+
+    try {
+        const response = await fetch('http://186.246.14.209:8000/classify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+
+        // Проверяем, успешен ли ответ
+        if (!response.ok) {
+            let errorMsg = `Ошибка сервера: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.detail || errorMsg;
+            } catch (e) {
+                // если ответ не JSON
+                errorMsg = await response.text() || errorMsg;
+            }
+            throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        
+        // Очищаем и выводим результат
+        resultDiv.innerHTML = '';
+        const preElement = document.createElement('pre');
+        preElement.textContent = data.result;
+        resultDiv.appendChild(preElement);
+        
+    } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    }
+}
 
     async function analyzeSites() {
         const urlsText = document.getElementById('urls').value;

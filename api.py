@@ -11,9 +11,13 @@ from collections import defaultdict
 from newspaper import Article
 import feedparser
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CLASSIFIER_PATH = os.path.join(BASE_DIR, 'classifier.py')
 
 app = FastAPI()
 
@@ -35,8 +39,15 @@ class SitesRequest(BaseModel):
 @app.post("/classify")
 async def classify(request: TextRequest):
     try:
+        # result = subprocess.run(
+        #     ['python3', '/opt/ai-agent/classifier.py'],
+        #     input=request.text,
+        #     capture_output=True,
+        #     text=True,
+        #     timeout=30
+        # )
         result = subprocess.run(
-            ['python3', '/opt/ai-agent/classifier.py'],
+            ['python3', CLASSIFIER_PATH],
             input=request.text,
             capture_output=True,
             text=True,
