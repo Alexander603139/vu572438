@@ -197,7 +197,7 @@ async def analyze_sites(request: SitesRequest):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, _ = await proc.communicate(input=text.encode())
+            stdout, stderr = await proc.communicate(input=text.encode())
             output = stdout.decode()
             logger.info(f"Classifier stdout: {output}")
             if stderr:
