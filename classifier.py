@@ -1,7 +1,4 @@
-import yaml
-import sys
-import re
-import os
+import os, yaml, sys, re
 from collections import defaultdict
 
 # Определяем путь к YAML-файлу — он лежит рядом с этим скриптом

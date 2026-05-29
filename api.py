@@ -189,14 +189,19 @@ async def analyze_sites(request: SitesRequest):
         for art in articles_data:
             text = art['text']
             preview = art['preview']
+            logger.info(f"Article URL: {art['url']}, text length: {len(text)}")
+            logger.info(f"Preview: {preview}")
             proc = await asyncio.create_subprocess_exec(
-                'python3', '/opt/ai-agent/classifier.py',
+                'python3', CLASSIFIER_PATH,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
             stdout, _ = await proc.communicate(input=text.encode())
             output = stdout.decode()
+            logger.info(f"Classifier stdout: {output}")
+            if stderr:
+                logger.error(f"Classifier stderr: {stderr}")
             dist = {}
             for line in output.split('\n'):
                 if ':' in line and '%' in line:
