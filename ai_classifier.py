@@ -26,12 +26,12 @@ SYSTEM_PROMPT = """Ты — классификатор политических 
 Теперь классифицируй следующий текст. Ответ должен быть строго в формате JSON:
 {"category": "название категории", "confidence": 0.0-1.0}"""
 
-async def query_ollama(prompt: str) -> dict:
+async def query(prompt: str) -> dict:
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "qwen3:1.8b",
+                "model": "tinyllama:1.1b",
                 "prompt": prompt,
                 "stream": False,
                 "system": SYSTEM_PROMPT
@@ -43,7 +43,7 @@ async def query_ollama(prompt: str) -> dict:
 async def classify(request: TextRequest):
     try:
         user_prompt = f"Текст: {request.text}\nКатегория (только JSON):"
-        result = await query_ollama(user_prompt)
+        result = await query(user_prompt)
         response_text = result.get("response", "")
         # Извлекаем JSON из ответа модели
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
