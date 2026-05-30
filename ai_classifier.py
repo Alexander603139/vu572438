@@ -58,7 +58,7 @@ PROMPT = """{input_text}
 async def query_yandexgpt(text: str) -> dict:
     """Отправляет запрос к YandexGPT и возвращает ответ."""
     payload = {
-        "modelUri": f"cls://{FOLDER_ID}/yandexgpt/latest",
+        "modelUri": f"cls://{FOLDER_ID}/yandexgpt/rc",
         "taskDescription": "Классификация текста по политической ориентации",
         "labels": [
             "Экономические левые",
