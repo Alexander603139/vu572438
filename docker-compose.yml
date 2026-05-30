@@ -27,3 +27,14 @@ services:
       - "8080:80"
     depends_on:
       - api
+      
+  ai_classifier:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai_classifier
+    container_name: ai-agent-ai-classifier
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    depends_on:
+      - api
