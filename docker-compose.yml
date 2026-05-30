@@ -12,6 +12,11 @@ services:
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro
       # - ./political_markers.yml:/opt/ai-agent/political_markers.yml:ro
+    environment:
+      YC_API_KEY: ${YC_API_KEY}
+      YC_FOLDER_ID: ${YC_FOLDER_ID}
+    depends_on:
+      - ai_classifier
     logging:
       driver: "json-file"
       options:
@@ -27,7 +32,7 @@ services:
       - "8080:80"
     depends_on:
       - api
-      
+
   ai_classifier:
     build:
       context: .
@@ -36,5 +41,6 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
-    depends_on:
-      - api
+    environment:
+      YC_API_KEY: ${YC_API_KEY}
+      YC_FOLDER_ID: ${YC_FOLDER_ID}

@@ -1,68 +1,122 @@
+# /opt/ai-agent/ai_classifier.py
+import os
+import json
+import logging
+import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import httpx
-import asyncio
-import json
-import re
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 class TextRequest(BaseModel):
     text: str
 
-# Few-shot промпт с вашими 4 категориями и примерами
-SYSTEM_PROMPT = """Ты — классификатор политических текстов. Относи текст к одной из четырёх категорий:
-- Экономические левые: поддержка госрегулирования, соцвыплат, национализации.
-- Экономические правые: поддержка рынка, приватизации, снижения налогов.
-- Социально-либертарные: поддержка свобод, прав человека, толерантности.
-- Социально-авторитарные: поддержка порядка, традиций, сильной власти.
+# --- Конфигурация YandexGPT ---
+# ID каталога и API-ключ сервисного аккаунта (будут читаться из переменных окружения)
+FOLDER_ID = os.environ.get("YC_FOLDER_ID")
+API_KEY = os.environ.get("YC_API_KEY")
+
+# URL API классификации
+CLASSIFY_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification"
+
+# Заголовки авторизации
+HEADERS = {
+    "Authorization": f"Api-Key {API_KEY}",
+    "Content-Type": "application/json"
+}
+
+# Промпт, где задаются категории и примеры (few-shot)
+PROMPT = """{input_text}
+
+Определи политическую ориентацию данного текста. Относи текст к одной из следующих категорий:
+1. Экономические левые (госрегулирование, соцвыплаты, национализация)
+2. Экономические правые (рынок, приватизация, снижение налогов)
+3. Социально-либертарные (свободы, права человека, толерантность)
+4. Социально-авторитарные (порядок, традиции, сильная власть)
 
 Примеры:
-Текст: "Государство должно национализировать заводы и повысить налоги для богатых." → Экономические левые
-Текст: "Необходимо снизить налоги и приватизировать госпредприятия." → Экономические правые
-Текст: "Свобода слова и права ЛГБТ должны быть защищены законом." → Социально-либертарные
-Текст: "Традиционные ценности и суверенитет важнее западных свобод." → Социально-авторитарные
+Текст: "Государство должно национализировать заводы и повысить налоги для богатых."
+Категория: Экономические левые
 
-Теперь классифицируй следующий текст. Ответ должен быть строго в формате JSON:
-{"category": "название категории", "confidence": 0.0-1.0}"""
+Текст: "Необходимо снизить налоги и приватизировать госпредприятия."
+Категория: Экономические правые
 
-async def query(prompt: str) -> dict:
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            "http://172.17.0.1:11434/api/generate",
-            json={
-                "model": "tinyllama:1.1b",
-                "prompt": prompt,
-                "stream": False,
-                "system": SYSTEM_PROMPT
-            }
-        )
-        return resp.json()
+Текст: "Свобода слова и права ЛГБТ должны быть защищены законом."
+Категория: Социально-либертарные
+
+Текст: "Традиционные ценности и суверенитет важнее западных свобод."
+Категория: Социально-авторитарные
+
+Теперь проанализируй следующий текст и выведи только название категории из списка выше.
+
+Текст: {input_text}
+Категория:"""
+
+async def query_yandexgpt(text: str) -> dict:
+    """Отправляет запрос к YandexGPT и возвращает ответ."""
+    payload = {
+        "modelUri": f"cls://{FOLDER_ID}/yandexgpt/latest",
+        "taskDescription": "Классификация текста по политической ориентации",
+        "labels": [
+            "Экономические левые",
+            "Экономические правые",
+            "Социально-либертарные",
+            "Социально-авторитарные"
+        ],
+        "text": text,
+        "samples": [
+            {"text": "Государство должно национализировать заводы и повысить налоги для богатых.", "label": "Экономические левые"},
+            {"text": "Необходимо снизить налоги и приватизировать госпредприятия.", "label": "Экономические правые"},
+            {"text": "Свобода слова и права ЛГБТ должны быть защищены законом.", "label": "Социально-либертарные"},
+            {"text": "Традиционные ценности и суверенитет важнее западных свобод.", "label": "Социально-авторитарные"}
+        ]
+    }
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(CLASSIFY_URL, headers=HEADERS, json=payload)
+        response.raise_for_status()
+        return response.json()
 
 @app.post("/classify")
 async def classify(request: TextRequest):
+    """Эндпоинт для классификации текста."""
     try:
-        user_prompt = f"Текст: {request.text}\nКатегория (только JSON):"
-        result = await query(user_prompt)
-        response_text = result.get("response", "")
-        # Извлекаем JSON из ответа модели
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-        if json_match:
-            data = json.loads(json_match.group())
-            return data
-        else:
-            # fallback: ищем категорию в тексте
-            for cat in ["Экономические левые", "Экономические правые", "Социально-либертарные", "Социально-авторитарные"]:
-                if cat in response_text:
-                    return {"category": cat, "confidence": 0.5}
-            raise ValueError("Не удалось распознать категорию")
+        result = await query_yandexgpt(request.text)
+        # Извлекаем предсказанную категорию из ответа
+        # Ожидаемая структура ответа: {'predictions': [{'label': 'Категория', 'confidence': 0.99}]}
+        predictions = result.get('predictions', [])
+        if not predictions:
+            raise ValueError("Не удалось получить ответ от YandexGPT")
+
+        best_prediction = predictions[0]
+        category = best_prediction.get('label')
+        confidence = best_prediction.get('confidence', 0.0)
+
+        # Формируем распределение в процентах
+        categories = [
+            "Экономические левые",
+            "Экономические правые",
+            "Социально-либертарные",
+            "Социально-авторитарные"
+        ]
+        distribution = {cat: (100.0 if cat == category else 0.0) for cat in categories}
+
+        # Формируем результат в том же формате, что и старый классификатор
+        result_str = "\nРезультат классификации:\n"
+        for cat, perc in distribution.items():
+            result_str += f"  {cat}: {perc}%\n"
+        result_str += f"Уверенность ИИ: {confidence:.2f}\n"
+        return {"result": result_str}
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error: {e.response.text}")
+        raise HTTPException(status_code=500, detail=f"Ошибка YandexGPT API: {e.response.text}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Unexpected error")
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка: {str(e)}")
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
