@@ -21,6 +21,8 @@ services:
       driver: "json-file"
       options:
         max-size: "10m"
+    env_file:
+      - .env
 
   web:
     build:
@@ -44,3 +46,5 @@ services:
     environment:
       YC_API_KEY: ${YC_API_KEY}
       YC_FOLDER_ID: ${YC_FOLDER_ID}
+    env_file:
+      - .env
