@@ -29,7 +29,7 @@ SYSTEM_PROMPT = """Ты — классификатор политических 
 async def query(prompt: str) -> dict:
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(
-            "http://localhost:11434/api/generate",
+            "http://172.17.0.1:11434/api/generate",
             json={
                 "model": "tinyllama:1.1b",
                 "prompt": prompt,
