@@ -27,7 +27,7 @@ SYSTEM_PROMPT = """Ты — классификатор политических 
 {"category": "название категории", "confidence": 0.0-1.0}"""
 
 async def query(prompt: str) -> dict:
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             "http://172.17.0.1:11434/api/generate",
             json={
