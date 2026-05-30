@@ -39,7 +39,7 @@ class SitesRequest(BaseModel):
 @app.post("/classify")
 async def classify(request: TextRequest):
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
                 "http://ai_classifier:8001/classify",
                 json={"text": request.text}
