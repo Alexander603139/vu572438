@@ -36,6 +36,32 @@ class SitesRequest(BaseModel):
     urls: List[str]
     max_articles_per_site: int = 5
 
+# @app.post("/classify")
+# async def classify(request: TextRequest):
+#     try:
+#         async with httpx.AsyncClient(timeout=120.0) as client:
+#             resp = await client.post(
+#                 "http://ai_classifier:8001/classify",
+#                 json={"text": request.text}
+#             )
+#             if resp.status_code == 200:
+#                 data = resp.json()
+#                 category = data.get("category")
+#                 confidence = data.get("confidence", 0.0)
+#                 # Преобразуем единственную категорию в распределение 100%
+#                 categories = ["Экономические левые", "Экономические правые", "Социально-либертарные", "Социально-авторитарные"]
+#                 dist = {cat: (100.0 if cat == category else 0.0) for cat in categories}
+#                 # Формируем вывод в том же формате, что и старый классификатор
+#                 result_str = "\nРезультат классификации:\n"
+#                 for cat, perc in dist.items():
+#                     result_str += f"  {cat}: {perc}%\n"
+#                 result_str += f"Уверенность ИИ: {confidence}\n"
+#                 return {"result": result_str}
+#             else:
+#                 raise HTTPException(status_code=resp.status_code, detail="AI classifier error")
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/classify")
 async def classify(request: TextRequest):
     try:
@@ -45,18 +71,7 @@ async def classify(request: TextRequest):
                 json={"text": request.text}
             )
             if resp.status_code == 200:
-                data = resp.json()
-                category = data.get("category")
-                confidence = data.get("confidence", 0.0)
-                # Преобразуем единственную категорию в распределение 100%
-                categories = ["Экономические левые", "Экономические правые", "Социально-либертарные", "Социально-авторитарные"]
-                dist = {cat: (100.0 if cat == category else 0.0) for cat in categories}
-                # Формируем вывод в том же формате, что и старый классификатор
-                result_str = "\nРезультат классификации:\n"
-                for cat, perc in dist.items():
-                    result_str += f"  {cat}: {perc}%\n"
-                result_str += f"Уверенность ИИ: {confidence}\n"
-                return {"result": result_str}
+                return resp.json()  # { "result": "...%" }
             else:
                 raise HTTPException(status_code=resp.status_code, detail="AI classifier error")
     except Exception as e:
