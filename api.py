@@ -256,6 +256,25 @@ async def analyze_sites(request: SitesRequest):
 async def health():
     return {"status": "ok"}
 
+class KeywordsRequest(BaseModel):
+    text: str
+    num_keywords: int = 10
+
+@app.post("/keywords")
+async def keywords(request: KeywordsRequest):
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "http://ai_classifier:8001/extract_keywords",
+                json={"text": request.text, "num_keywords": request.num_keywords}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            else:
+                raise HTTPException(status_code=resp.status_code, detail="Keyword extraction error")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
