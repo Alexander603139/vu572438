@@ -209,19 +209,36 @@ async def analyze_sites(request: SitesRequest):
         for art in articles_data:
             text = art['text']
             preview = art['preview']
-            logger.info(f"Article URL: {art['url']}, text length: {len(text)}")
-            logger.info(f"Preview: {preview}")
-            proc = await asyncio.create_subprocess_exec(
-                'python3', CLASSIFIER_PATH,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await proc.communicate(input=text.encode())
-            output = stdout.decode()
-            logger.info(f"Classifier stdout: {output}")
-            if stderr:
-                logger.error(f"Classifier stderr: {stderr}")
+                # --- ВЫЗОВ YANDEXGPT ВМЕСТО CLASSIFIER.PY ---
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        "http://ai_classifier:8001/classify",
+                        json={"text": text}
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        output = data.get("result", "")
+                    else:
+                        output = ""
+            except Exception as e:
+                logger.error(f"YandexGPT error for {art['url']}: {e}")
+                output = ""
+
+            # logger.info(f"Article URL: {art['url']}, text length: {len(text)}")
+            # logger.info(f"Preview: {preview}")
+            # proc = await asyncio.create_subprocess_exec(
+            #     'python3', CLASSIFIER_PATH,
+            #     stdin=asyncio.subprocess.PIPE,
+            #     stdout=asyncio.subprocess.PIPE,
+            #     stderr=asyncio.subprocess.PIPE
+            # )
+            # stdout, stderr = await proc.communicate(input=text.encode())
+            # output = stdout.decode()
+            # logger.info(f"Classifier stdout: {output}")
+            # if stderr:
+            #     logger.error(f"Classifier stderr: {stderr}")
+                # --- КОНЕЦ ЗАМЕНЫ ---
             dist = {}
             for line in output.split('\n'):
                 if ':' in line and '%' in line:
