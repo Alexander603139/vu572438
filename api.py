@@ -240,6 +240,25 @@ async def analyze_sites(request: SitesRequest):
             #     logger.error(f"Classifier stderr: {stderr}")
                 # --- КОНЕЦ ЗАМЕНЫ ---
             dist = {}
+            confidence = 0.0
+            for line in output.split('\n'):
+                if ':' in line and '%' in line:
+                    parts = line.split(':')
+                    if len(parts) == 2:
+                        cat = parts[0].strip()
+                        try:
+                            percent = float(parts[1].replace('%', '').strip())
+                            dist[cat] = percent
+                            total_counts[cat] += percent
+                        except:
+                            pass
+                elif 'Уверенность ИИ:' in line:
+                    # Извлекаем число после двоеточия
+                    try:
+                        confidence = float(line.split(':')[1].strip())
+                    except:
+                        confidence = 0.0
+
             for line in output.split('\n'):
                 if ':' in line and '%' in line:
                     parts = line.split(':')
@@ -254,7 +273,8 @@ async def analyze_sites(request: SitesRequest):
             articles_result.append({
                 "url": art['url'],
                 "preview": preview,
-                "distribution": dist
+                "distribution": dist,
+                "confidence": confidence
             })
         if total_counts:
             total = sum(total_counts.values())
