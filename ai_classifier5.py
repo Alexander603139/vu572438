@@ -84,6 +84,57 @@ async def classify(request: TextRequest):
         logger.exception("Error")
         raise HTTPException(status_code=500, detail=str(e))
 
+class KeywordsRequest(BaseModel):
+    text: str
+    num_keywords: int = 10
+
+async def extract_keywords_yandex(text: str, num_keywords: int) -> list:
+    """Запрос к YandexGPT для выделения ключевых фраз."""
+    prompt = f"Выдели из текста {num_keywords} ключевых слов или коротких фраз (на русском), которые лучше всего отражают его суть. Ответ дай строго в виде JSON-списка строк, например: [\"фраза1\", \"фраза2\"]\n\nТекст: {text}"
+    payload = {
+        "modelUri": f"cls://{FOLDER_ID}/yandexgpt/rc",
+        "completionOptions": {
+            "stream": False,
+            "temperature": 0.1,
+            "maxTokens": 500
+        },
+        "messages": [
+            {
+                "role": "system",
+                "text": "Ты — помощник, который выделяет ключевые слова из текста. Отвечай только JSON-списком."
+            },
+            {
+                "role": "user",
+                "text": prompt
+            }
+        ]
+    }
+    # Используем chat completion API (более удобный для таких задач)
+    chat_url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+    headers = {
+        "Authorization": f"Api-Key {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(chat_url, headers=headers, json=payload)
+        resp.raise_for_status()
+        result = resp.json()
+        # Извлекаем текст ответа
+        response_text = result['result']['alternatives'][0]['message']['text']
+        # Парсим JSON
+        import json
+        keywords = json.loads(response_text)
+        return keywords
+
+@app.post("/extract_keywords")
+async def extract_keywords(request: KeywordsRequest):
+    try:
+        keywords = await extract_keywords_yandex(request.text, request.num_keywords)
+        return {"keywords": keywords}
+    except Exception as e:
+        logger.exception("Error extracting keywords")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
