@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CLASSIFIER_PATH = os.path.join(BASE_DIR, 'classifier.py')
+CLASSIFIER_PATH = os.path.join(BASE_DIR, "classifier.py")
 
 app = FastAPI()
 
@@ -29,12 +29,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class TextRequest(BaseModel):
     text: str
+
 
 class SitesRequest(BaseModel):
     urls: List[str]
     max_articles_per_site: int = 5
+
 
 # @app.post("/classify")
 # async def classify(request: TextRequest):
@@ -49,7 +52,7 @@ class SitesRequest(BaseModel):
 #                 category = data.get("category")
 #                 confidence = data.get("confidence", 0.0)
 #                 # Преобразуем единственную категорию в распределение 100%
-#                 categories = ["Экономические левые", "Экономические правые", "Социально-либертарные", "Социально-авторитарные"]
+#                 categories = ["Экономические левые", "Экономические правые", "Социально-либеральные", "Социально-авторитарные"]
 #                 dist = {cat: (100.0 if cat == category else 0.0) for cat in categories}
 #                 # Формируем вывод в том же формате, что и старый классификатор
 #                 result_str = "\nРезультат классификации:\n"
@@ -62,20 +65,23 @@ class SitesRequest(BaseModel):
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/classify")
 async def classify(request: TextRequest):
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
-                "http://ai_classifier:8001/classify",
-                json={"text": request.text}
+                "http://ai_classifier:8001/classify", json={"text": request.text}
             )
             if resp.status_code == 200:
                 return resp.json()  # { "result": "...%" }
             else:
-                raise HTTPException(status_code=resp.status_code, detail="AI classifier error")
+                raise HTTPException(
+                    status_code=resp.status_code, detail="AI classifier error"
+                )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 def extract_text_with_newspaper(html: str, url: str) -> tuple:
     """Извлечение текста через newspaper3k + резерв BeautifulSoup"""
@@ -85,27 +91,28 @@ def extract_text_with_newspaper(html: str, url: str) -> tuple:
         article.parse()
         text = article.text
         if text and len(text) > 200:
-            preview = ' '.join(text.split()[:10]) + '...'
+            preview = " ".join(text.split()[:10]) + "..."
             return text[:10000], preview
     except Exception as e:
         logger.warning(f"Newspaper failed for {url}: {e}")
     # fallback на BeautifulSoup
     try:
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, "lxml")
         for script in soup(["script", "style", "nav", "footer", "header"]):
             script.decompose()
-        article_tag = soup.find('article')
+        article_tag = soup.find("article")
         if article_tag:
-            text = article_tag.get_text(separator=' ', strip=True)
+            text = article_tag.get_text(separator=" ", strip=True)
         else:
-            text = soup.get_text(separator=' ', strip=True)
-        text = re.sub(r'\s+', ' ', text)
+            text = soup.get_text(separator=" ", strip=True)
+        text = re.sub(r"\s+", " ", text)
         if len(text) > 200:
-            preview = ' '.join(text.split()[:10]) + '...'
+            preview = " ".join(text.split()[:10]) + "..."
             return text[:10000], preview
     except Exception as e:
         logger.warning(f"BeautifulSoup fallback failed for {url}: {e}")
     return "", "Не удалось извлечь текст"
+
 
 async def fetch_article(client, url: str):
     try:
@@ -113,10 +120,11 @@ async def fetch_article(client, url: str):
         if resp.status_code == 200:
             text, preview = extract_text_with_newspaper(resp.text, url)
             if text:
-                return {'text': text, 'preview': preview, 'url': url}
+                return {"text": text, "preview": preview, "url": url}
     except Exception as e:
         logger.warning(f"Fetch error {url}: {e}")
     return None
+
 
 async def fetch_rss_feed(feed_url: str, max_items: int):
     try:
@@ -125,7 +133,7 @@ async def fetch_rss_feed(feed_url: str, max_items: int):
         articles = []
         async with httpx.AsyncClient() as client:
             for entry in entries:
-                link = entry.get('link')
+                link = entry.get("link")
                 if not link:
                     continue
                 try:
@@ -133,7 +141,9 @@ async def fetch_rss_feed(feed_url: str, max_items: int):
                     if resp.status_code == 200:
                         text, preview = extract_text_with_newspaper(resp.text, link)
                         if text:
-                            articles.append({'text': text, 'preview': preview, 'url': link})
+                            articles.append(
+                                {"text": text, "preview": preview, "url": link}
+                            )
                 except:
                     continue
         return articles
@@ -141,28 +151,41 @@ async def fetch_rss_feed(feed_url: str, max_items: int):
         logger.warning(f"RSS error {feed_url}: {e}")
         return []
 
+
 def is_likely_article(url: str, site_domain: str) -> bool:
     """Проверяет, похожа ли ссылка на статью"""
     url_lower = url.lower()
     patterns = [
-        'news', 'article', 'post', 'story', '202', '2025', '2026',
-        '/p/', '/entry', '/read/', '/content/', '/story/', '/news/'
+        "news",
+        "article",
+        "post",
+        "story",
+        "202",
+        "2025",
+        "2026",
+        "/p/",
+        "/entry",
+        "/read/",
+        "/content/",
+        "/story/",
+        "/news/",
     ]
     if any(p in url_lower for p in patterns):
         return True
     # Проверка на наличие даты в URL (например, /2024/05/23/)
-    if re.search(r'/\d{4}/\d{1,2}/\d{1,2}/', url_lower):
+    if re.search(r"/\d{4}/\d{1,2}/\d{1,2}/", url_lower):
         return True
     return False
+
 
 async def fetch_site_articles(site_url: str, max_articles: int):
     # Сначала RSS
     rss_urls = [
-        site_url.rstrip('/') + '/rss',
-        site_url.rstrip('/') + '/feed',
-        site_url.rstrip('/') + '/rss.xml',
-        site_url.rstrip('/') + '/feed.xml',
-        site_url.rstrip('/') + '/news/rss'
+        site_url.rstrip("/") + "/rss",
+        site_url.rstrip("/") + "/feed",
+        site_url.rstrip("/") + "/rss.xml",
+        site_url.rstrip("/") + "/feed.xml",
+        site_url.rstrip("/") + "/news/rss",
     ]
     for rss in rss_urls:
         articles = await fetch_rss_feed(rss, max_articles)
@@ -174,16 +197,16 @@ async def fetch_site_articles(site_url: str, max_articles: int):
             resp = await client.get(site_url, timeout=10.0, follow_redirects=True)
             if resp.status_code != 200:
                 return []
-            soup = BeautifulSoup(resp.text, 'lxml')
+            soup = BeautifulSoup(resp.text, "lxml")
             links = set()
-            for a in soup.find_all('a', href=True):
-                href = a['href']
-                if href.startswith('/'):
-                    href = site_url.rstrip('/') + href
-                if href.startswith('http') and site_url.split('/')[2] in href:
-                    if is_likely_article(href, site_url.split('/')[2]):
+            for a in soup.find_all("a", href=True):
+                href = a["href"]
+                if href.startswith("/"):
+                    href = site_url.rstrip("/") + href
+                if href.startswith("http") and site_url.split("/")[2] in href:
+                    if is_likely_article(href, site_url.split("/")[2]):
                         links.add(href)
-            unique_links = list(links)[:max_articles * 3]
+            unique_links = list(links)[: max_articles * 3]
             tasks = [fetch_article(client, link) for link in unique_links]
             results = await asyncio.gather(*tasks)
             articles = [r for r in results if r is not None]
@@ -192,29 +215,31 @@ async def fetch_site_articles(site_url: str, max_articles: int):
             logger.warning(f"Site fetch error {site_url}: {e}")
             return []
 
+
 @app.post("/analyze_sites")
 async def analyze_sites(request: SitesRequest):
     results = []
     for site in request.urls:
         articles_data = await fetch_site_articles(site, request.max_articles_per_site)
         if not articles_data:
-            results.append({
-                "url": site,
-                "error": "Не найдено статей (проверьте RSS или HTML-ссылку)",
-                "articles": []
-            })
+            results.append(
+                {
+                    "url": site,
+                    "error": "Не найдено статей (проверьте RSS или HTML-ссылку)",
+                    "articles": [],
+                }
+            )
             continue
         articles_result = []
         total_counts = defaultdict(int)
         for art in articles_data:
-            text = art['text']
-            preview = art['preview']
-                # --- ВЫЗОВ YANDEXGPT ВМЕСТО CLASSIFIER.PY ---
+            text = art["text"]
+            preview = art["preview"]
+            # --- ВЫЗОВ YANDEXGPT ВМЕСТО CLASSIFIER.PY ---
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     resp = await client.post(
-                        "http://ai_classifier:8001/classify",
-                        json={"text": text}
+                        "http://ai_classifier:8001/classify", json={"text": text}
                     )
                     if resp.status_code == 200:
                         data = resp.json()
@@ -238,66 +263,81 @@ async def analyze_sites(request: SitesRequest):
             # logger.info(f"Classifier stdout: {output}")
             # if stderr:
             #     logger.error(f"Classifier stderr: {stderr}")
-                # --- КОНЕЦ ЗАМЕНЫ ---
+            # --- КОНЕЦ ЗАМЕНЫ ---
             dist = {}
             confidence = 0.0
-            for line in output.split('\n'):
-                if ':' in line and '%' in line:
-                    parts = line.split(':')
+            for line in output.split("\n"):
+                if ":" in line and "%" in line:
+                    parts = line.split(":")
                     if len(parts) == 2:
                         cat = parts[0].strip()
                         try:
-                            percent = float(parts[1].replace('%', '').strip())
+                            percent = float(parts[1].replace("%", "").strip())
                             dist[cat] = percent
                             total_counts[cat] += percent
                         except:
                             pass
-                elif 'Уверенность ИИ:' in line:
+                elif "Уверенность ИИ:" in line:
                     # Извлекаем число после двоеточия
                     try:
-                        confidence = float(line.split(':')[1].strip())
+                        confidence = float(line.split(":")[1].strip())
                     except:
                         confidence = 0.0
 
-            for line in output.split('\n'):
-                if ':' in line and '%' in line:
-                    parts = line.split(':')
+            for line in output.split("\n"):
+                if ":" in line and "%" in line:
+                    parts = line.split(":")
                     if len(parts) == 2:
                         cat = parts[0].strip()
                         try:
-                            percent = float(parts[1].replace('%', '').strip())
+                            percent = float(parts[1].replace("%", "").strip())
                             dist[cat] = percent
                             total_counts[cat] += percent
                         except:
                             pass
-            articles_result.append({
-                "url": art['url'],
-                "preview": preview,
-                "distribution": dist,
-                "confidence": confidence
-            })
+            articles_result.append(
+                {
+                    "url": art["url"],
+                    "preview": preview,
+                    "distribution": dist,
+                    "confidence": confidence,
+                }
+            )
         if total_counts:
             total = sum(total_counts.values())
-            norm = {cat: round(val / total * 100, 1) for cat, val in total_counts.items()} if total > 0 else {}
+            norm = (
+                {cat: round(val / total * 100, 1) for cat, val in total_counts.items()}
+                if total > 0
+                else {}
+            )
         else:
             norm = {}
 
-        total_confidence = sum(art.get('confidence', 0) for art in articles_result)
-        avg_confidence = round(total_confidence / len(articles_result), 2) if articles_result else 0.0
-        
-        results.append({
-            "url": site,
-            "articles_parsed": len(articles_data),
-            "distribution": norm,
-            "articles": articles_result,
-            "avg_confidence": avg_confidence
-        })
+        total_confidence = sum(art.get("confidence", 0) for art in articles_result)
+        avg_confidence = (
+            round(total_confidence / len(articles_result), 2)
+            if articles_result
+            else 0.0
+        )
+
+        results.append(
+            {
+                "url": site,
+                "articles_parsed": len(articles_data),
+                "distribution": norm,
+                "articles": articles_result,
+                "avg_confidence": avg_confidence,
+            }
+        )
     return {"results": results}
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
