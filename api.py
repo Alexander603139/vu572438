@@ -281,11 +281,16 @@ async def analyze_sites(request: SitesRequest):
             norm = {cat: round(val / total * 100, 1) for cat, val in total_counts.items()} if total > 0 else {}
         else:
             norm = {}
+
+        total_confidence = sum(art.get('confidence', 0) for art in articles_result)
+        avg_confidence = round(total_confidence / len(articles_result), 2) if articles_result else 0.0
+        
         results.append({
             "url": site,
             "articles_parsed": len(articles_data),
             "distribution": norm,
-            "articles": articles_result
+            "articles": articles_result,
+            "avg_confidence": avg_confidence
         })
     return {"results": results}
 

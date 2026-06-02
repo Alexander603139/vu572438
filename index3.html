@@ -133,50 +133,48 @@ async function analyzeSingle() {
     }
 }
 
-async function analyzeSites() {
-    const urlsText = document.getElementById('urls').value;
-    const urls = urlsText.split('\n').filter(u => u.trim().length > 0);
-    const maxArticles = parseInt(document.getElementById('maxArticles').value);
-    if (urls.length === 0) return;
-    document.getElementById('sitesResult').innerHTML = 'Анализ выполняется... (может занять несколько минут)';
-    try {
-        const response = await fetch('http://186.246.14.209:8000/analyze_sites', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urls: urls, max_articles_per_site: maxArticles })
-        });
-        const data = await response.json();
-        let html = '<h3>Результаты по сайтам</h3>';
-        for (const item of data.results) {
-            if (item.error) {
-                html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
-                continue;
-            }
-            const avgConf = item.avg_confidence !== undefined ? `, ср. уверенность: ${item.avg_confidence}` : '';
-            html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed}${avgConf})</summary>`;
-            html += '</table><tr><th>Категория</th><th>%</th></tr>';
-            for (const [cat, perc] of Object.entries(item.distribution)) {
-                html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
-            }
-            html += '</table>';
-            html += '<h4>Статьи:</h4><ul>';
-            for (const art of item.articles) {
-                html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
-                html += `<span class="article-preview">Превью: ${art.preview}</span><br>`;
-                html += `Распределение: `;
-                for (const [cat, perc] of Object.entries(art.distribution)) {
-                    html += `${cat} ${perc}%; `;
+    async function analyzeSites() {
+        const urlsText = document.getElementById('urls').value;
+        const urls = urlsText.split('\n').filter(u => u.trim().length > 0);
+        const maxArticles = parseInt(document.getElementById('maxArticles').value);
+        if (urls.length === 0) return;
+        document.getElementById('sitesResult').innerHTML = 'Анализ выполняется... (может занять несколько минут)';
+        try {
+            const response = await fetch('http://186.246.14.209:8000/analyze_sites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urls: urls, max_articles_per_site: maxArticles })
+            });
+            const data = await response.json();
+            let html = '<h3>Результаты по сайтам</h3>';
+            for (const item of data.results) {
+                if (item.error) {
+                    html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
+                    continue;
                 }
-                const conf = art.confidence !== undefined ? `<br>Уверенность: ${art.confidence}` : '';
-                html += `${conf}</li>`;
+                html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed})</summary>`;
+                html += '<table><tr><th>Категория</th><th>%</th></tr>';
+                for (const [cat, perc] of Object.entries(item.distribution)) {
+                    html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
+                }
+                html += '</table>';
+                html += '<h4>Статьи:</h4><ul>';
+                for (const art of item.articles) {
+                    html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
+                    html += `<span class="article-preview">Превью: ${art.preview}</span><br>`;
+                    html += `Распределение: `;
+                    for (const [cat, perc] of Object.entries(art.distribution)) {
+                        html += `${cat} ${perc}%; `;
+                    }
+                    html += `</li>`;
+                }
+                html += `</ul></details><hr>`;
             }
-            html += `</ul></details><hr>`;
+            document.getElementById('sitesResult').innerHTML = html;
+        } catch (error) {
+            document.getElementById('sitesResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
         }
-        document.getElementById('sitesResult').innerHTML = html;
-    } catch (error) {
-        document.getElementById('sitesResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
     }
-}
 </script>
 </body>
 </html>
