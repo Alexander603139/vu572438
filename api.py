@@ -33,55 +33,42 @@ app.add_middleware(
 class TextRequest(BaseModel):
     text: str
 
-
 class SitesRequest(BaseModel):
     urls: List[str]
     max_articles_per_site: int = 5
 
-
-# @app.post("/classify")
-# async def classify(request: TextRequest):
-#     try:
-#         async with httpx.AsyncClient(timeout=120.0) as client:
-#             resp = await client.post(
-#                 "http://ai_classifier:8001/classify",
-#                 json={"text": request.text}
-#             )
-#             if resp.status_code == 200:
-#                 data = resp.json()
-#                 category = data.get("category")
-#                 confidence = data.get("confidence", 0.0)
-#                 # Преобразуем единственную категорию в распределение 100%
-#                 categories = ["Экономические левые", "Экономические правые", "Социально-либеральные", "Социально-авторитарные"]
-#                 dist = {cat: (100.0 if cat == category else 0.0) for cat in categories}
-#                 # Формируем вывод в том же формате, что и старый классификатор
-#                 result_str = "\nРезультат классификации:\n"
-#                 for cat, perc in dist.items():
-#                     result_str += f"  {cat}: {perc}%\n"
-#                 result_str += f"Уверенность ИИ: {confidence}\n"
-#                 return {"result": result_str}
-#             else:
-#                 raise HTTPException(status_code=resp.status_code, detail="AI classifier error")
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
+class KeywordsRequest(BaseModel):
+    text: str
+    max_per_category: int = 5
 
 @app.post("/classify")
 async def classify(request: TextRequest):
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "http://ai_classifier:8001/classify", json={"text": request.text}
             )
             if resp.status_code == 200:
                 return resp.json()  # { "result": "...%" }
             else:
-                raise HTTPException(
-                    status_code=resp.status_code, detail="AI classifier error"
-                )
+                raise HTTPException(status_code=resp.status_code, detail="AI classifier error")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/keywords")
+async def keywords(request: KeywordsRequest):
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "http://ai_classifier:8001/extract_keywords",
+                json={"text": request.text, "max_per_category": request.max_per_category}
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            else:
+                raise HTTPException(status_code=resp.status_code, detail="Keyword extraction error")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def extract_text_with_newspaper(html: str, url: str) -> tuple:
     """Извлечение текста через newspaper3k + резерв BeautifulSoup"""
@@ -235,7 +222,7 @@ async def analyze_sites(request: SitesRequest):
         for art in articles_data:
             text = art["text"]
             preview = art["preview"]
-            # --- ВЫЗОВ YANDEXGPT ВМЕСТО CLASSIFIER.PY ---
+
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     resp = await client.post(
@@ -249,22 +236,8 @@ async def analyze_sites(request: SitesRequest):
             except Exception as e:
                 logger.error(f"YandexGPT error for {art['url']}: {e}")
                 output = ""
-
-            # logger.info(f"Article URL: {art['url']}, text length: {len(text)}")
-            # logger.info(f"Preview: {preview}")
-            # proc = await asyncio.create_subprocess_exec(
-            #     'python3', CLASSIFIER_PATH,
-            #     stdin=asyncio.subprocess.PIPE,
-            #     stdout=asyncio.subprocess.PIPE,
-            #     stderr=asyncio.subprocess.PIPE
-            # )
-            # stdout, stderr = await proc.communicate(input=text.encode())
-            # output = stdout.decode()
-            # logger.info(f"Classifier stdout: {output}")
-            # if stderr:
-            #     logger.error(f"Classifier stderr: {stderr}")
-            # --- КОНЕЦ ЗАМЕНЫ ---
             dist = {}
+
             confidence = 0.0
             for line in output.split("\n"):
                 if ":" in line and "%" in line:

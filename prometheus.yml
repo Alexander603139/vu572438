@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'ai_classifier'
+    static_configs:
+      - targets: ['ai_classifier:8001']
