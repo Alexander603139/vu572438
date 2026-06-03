@@ -40,16 +40,11 @@ services:
       - "8000:8000"
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro
-      # - ./political_markers.yml:/opt/ai-agent/political_markers.yml:ro
     environment:
       YC_API_KEY: ${YC_API_KEY}
       YC_FOLDER_ID: ${YC_FOLDER_ID}
     depends_on:
       - ai_classifier
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
     env_file:
       - .env
 
@@ -73,9 +68,8 @@ services:
     ports:
       - "8001:8001"
     environment:
-      # YC_API_KEY: ${YC_API_KEY}
-      # YC_FOLDER_ID: ${YC_FOLDER_ID}
+      YC_API_KEY: ${YC_API_KEY}
+      YC_FOLDER_ID: ${YC_FOLDER_ID}
       REDIS_URL: redis://redis:6379
-    # env_file:
-      # - .env
-      # - redis
+    env_file:
+      - .env
