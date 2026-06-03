@@ -29,7 +29,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
-      
+
   api:
     build:
       context: .
@@ -76,6 +76,6 @@ services:
       # YC_API_KEY: ${YC_API_KEY}
       # YC_FOLDER_ID: ${YC_FOLDER_ID}
       REDIS_URL: redis://redis:6379
-    env_file:
+    # env_file:
       # - .env
-      - redis
+      # - redis
