@@ -1,6 +1,13 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-agent-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
   api:
     build:
       context: .
@@ -44,7 +51,9 @@ services:
     ports:
       - "8001:8001"
     environment:
-      YC_API_KEY: ${YC_API_KEY}
-      YC_FOLDER_ID: ${YC_FOLDER_ID}
+      # YC_API_KEY: ${YC_API_KEY}
+      # YC_FOLDER_ID: ${YC_FOLDER_ID}
+      REDIS_URL: redis://redis:6379
     env_file:
-      - .env
+      # - .env
+      - redis
