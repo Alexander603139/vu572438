@@ -107,12 +107,20 @@ async def query_yandexgpt(text: str) -> dict:
         resp.raise_for_status()
         data = resp.json()
         # tokens
-        tokens = data.get("inputTokens", 0)
+        tokens_raw = data.get("inputTokens", 0)
+        try:
+            tokens = int(tokens_raw)
+        except (ValueError, TypeError):
+            tokens = 0
         tokens_used_total.labels(endpoint='/classify').inc(tokens)
         # confidence — берём максимальную из predictions
         predictions = data.get("predictions", [])
         if predictions:
-            max_conf = max(p.get("confidence", 0) for p in predictions)
+            max_conf_raw = max(p.get("confidence", 0) for p in predictions)
+            try:
+                max_conf = float(max_conf_raw)
+            except (ValueError, TypeError):
+                max_conf = 0.0
             confidence_histogram.observe(max_conf)
         # Сохраняем в кэш на 1 час (3600 секунд)
         await redis_client.setex(cache_key, 3600, json.dumps(data))
