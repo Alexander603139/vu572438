@@ -29,6 +29,7 @@
 <div class="tab">
     <button class="tablinks" onclick="openTab(event, 'Single')" id="defaultOpen">Анализ одного текста</button>
     <button class="tablinks" onclick="openTab(event, 'Sites')">Анализ сайтов</button>
+    <button class="tablinks" onclick="openTab(event, 'Keywords')">Ключевые фразы</button>
 </div>
 
 <!-- Режим 1: один текст -->
@@ -49,6 +50,17 @@
     <br>
     <button onclick="analyzeSites()">Анализировать сайты</button>
     <div id="sitesResult" style="margin-top: 20px;"></div>
+</div>
+
+<!-- Новый tabcontent -->
+<div id="Keywords" class="tabcontent">
+    <h3>Выделение ключевых фраз по категориям</h3>
+    <textarea id="keywordsText" placeholder="Вставьте текст..."></textarea>
+    <br>
+    <label>Максимум фраз на категорию: <input type="number" id="maxKeywords" value="5" min="1" max="10"></label>
+    <br>
+    <button onclick="extractKeywords()">Извлечь ключевые фразы</button>
+    <div id="keywordsResult" style="margin-top: 20px;"></div>
 </div>
 
 <script>
@@ -152,6 +164,33 @@ async function analyzeSites() {
         document.getElementById('sitesResult').innerHTML = html;
     } catch (error) {
         document.getElementById('sitesResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    }
+}
+
+async function extractKeywords() {
+    const text = document.getElementById('keywordsText').value;
+    const maxPerCategory = parseInt(document.getElementById('maxKeywords').value);
+    if (!text.trim()) return;
+    const resultDiv = document.getElementById('keywordsResult');
+    resultDiv.innerHTML = 'Извлечение...';
+    try {
+        const response = await fetch('http://186.246.14.209:8000/keywords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, max_per_category: maxPerCategory })
+        });
+        const data = await response.json();
+        let html = '<h3>Ключевые фразы по категориям:</h3>';
+        for (const [cat, phrases] of Object.entries(data.keywords)) {
+            html += `<strong>${cat}</strong><ul>`;
+            for (const phrase of phrases) {
+                html += `<li>${phrase}</li>`;
+            }
+            html += `</ul>`;
+        }
+        resultDiv.innerHTML = html;
+    } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
     }
 }
 </script>
