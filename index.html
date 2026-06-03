@@ -67,29 +67,6 @@
     }
     document.getElementById("defaultOpen").click();
 
-    // async function analyzeSingle() {
-    //     const text = document.getElementById('singleText').value;
-    //     if (!text) return;
-    //     document.getElementById('singleResult').innerHTML = 'Анализ...';
-    //     try {
-    //         const response = await fetch('http://186.246.14.209:8000/classify', {
-    //             method: 'POST',
-    //             headers: { 'Content-Type': 'application/json' },
-    //             body: JSON.stringify({ text: text })
-    //         });
-    //         const data = await response.json();
-    //         const resultDiv = document.getElementById('singleResult');
-    //         resultDiv.innerHTML = ''; // Очищаем контейнер
-
-    //         const preElement = document.createElement('pre');
-    //         // textContent автоматически экранирует спецсимволы <, >, & и т.д.
-    //         preElement.textContent = data.result;
-    //         resultDiv.appendChild(preElement);
-    //     } catch (error) {
-    //         document.getElementById('singleResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
-    //     }
-    // }
-
 async function analyzeSingle() {
     const text = document.getElementById('singleText').value;
     if (!text.trim()) {
