@@ -1,6 +1,35 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-agent-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
   api:
     build:
       context: .
@@ -11,16 +40,11 @@ services:
       - "8000:8000"
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro
-      # - ./political_markers.yml:/opt/ai-agent/political_markers.yml:ro
     environment:
       YC_API_KEY: ${YC_API_KEY}
       YC_FOLDER_ID: ${YC_FOLDER_ID}
     depends_on:
       - ai_classifier
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
     env_file:
       - .env
 
@@ -49,5 +73,6 @@ services:
     environment:
       YC_API_KEY: ${YC_API_KEY}
       YC_FOLDER_ID: ${YC_FOLDER_ID}
+      REDIS_URL: redis://redis:6379
     env_file:
       - .env
