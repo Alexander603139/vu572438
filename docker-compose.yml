@@ -43,6 +43,9 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
+    volumes:
+      - ./political_markers.yml:/app/political_markers.yml:ro
+      - ./samples:/app/samples:ro   # если у вас есть папка samples
     environment:
       YC_API_KEY: ${YC_API_KEY}
       YC_FOLDER_ID: ${YC_FOLDER_ID}
