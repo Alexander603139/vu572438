@@ -4,6 +4,9 @@ networks:
   monitoring:
     driver: bridge
 
+volumes:
+  grafana-storage:
+
 services:
   redis:
     image: redis:7-alpine
@@ -11,6 +14,8 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    networks:
+      - monitoring
 
   prometheus:
     image: prom/prometheus:latest
@@ -30,7 +35,8 @@ services:
     container_name: grafana
     restart: unless-stopped
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-storage:/var/lib/grafana
+      # - ./grafana/provisioning:/etc/grafana/provisioning
     ports:
       - "3000:3000"
     environment:
@@ -57,6 +63,8 @@ services:
       - ai_classifier
     env_file:
       - .env
+    networks:
+      - monitoring
 
   web:
     build:
@@ -68,6 +76,8 @@ services:
       - "8080:80"
     depends_on:
       - api
+    networks:
+      - monitoring
 
   ai_classifier:
     build:
@@ -79,7 +89,7 @@ services:
       - "8001:8001"
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro
-      - ./samples:/app/samples:ro   # если у вас есть папка samples
+      - ./samples:/app/samples:ro
     environment:
       YC_API_KEY: ${YC_API_KEY}
       YC_FOLDER_ID: ${YC_FOLDER_ID}
