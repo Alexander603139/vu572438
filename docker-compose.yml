@@ -73,7 +73,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ai_classifier
-    container_name: ai-agent-ai-classifier
+    container_name: ai_classifier
     restart: unless-stopped
     ports:
       - "8001:8001"
