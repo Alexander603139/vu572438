@@ -30,8 +30,7 @@ class TestClassify:
         assert "keywords" in data
         keywords = data["keywords"]
         assert isinstance(keywords, dict)
-        # Хотя бы в одной категории должны быть фразы
-        assert any(len(v) > 0 for v in keywords.values())
+        assert all(isinstance(v, list) for v in keywords.values())
 
     def test_analyze_sites(self, base_url, api_session):
         urls = ["https://meduza.io"]

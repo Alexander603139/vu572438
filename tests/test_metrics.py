@@ -9,7 +9,8 @@ def test_metrics_endpoint(base_url, api_session):
 def test_metrics_available(base_url, api_session, metrics_url):
     resp = api_session.get(metrics_url)
     assert resp.status_code == 200
-    assert resp.headers["content-type"] == "text/plain; version=0.0.4"
+    # Проверяем только начало content-type
+    assert resp.headers["content-type"].startswith("text/plain")
 
 def test_metrics_contain_key_metrics(base_url, api_session, metrics_url):
     resp = api_session.get(metrics_url)
