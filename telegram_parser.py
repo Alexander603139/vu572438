@@ -1,4 +1,3 @@
-# app/services/social_analyzer.py
 import feedparser
 import re
 import logging

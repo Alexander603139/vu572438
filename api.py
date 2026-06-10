@@ -5,7 +5,7 @@ from typing import List, Dict
 import subprocess
 import httpx
 from bs4 import BeautifulSoup
-from app.services.social_analyzer import fetch_telegram_posts
+from telegram_parser import fetch_telegram_posts
 import asyncio
 import re
 from collections import defaultdict
