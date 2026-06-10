@@ -1,21 +1,21 @@
-version: '3.8'
+version: '3.8' # версия формата файла Docker Compose
 
-networks:
-  monitoring:
-    driver: bridge
+networks: #  объявление изолированных сетей для контейнеров
+  monitoring: # создание сети с именем monitoring
+    driver: bridge # тип сети «мост» для связи контейнеров на одном хосте
 
-volumes:
-  grafana-storage:
+volumes: # объявление постоянных хранилищ (дисков)
+  grafana-storage: # создание именованного диска для сохранения данных Grafana
 
 services:
   redis:
     image: redis:7-alpine
     container_name: ai-agent-redis
-    restart: unless-stopped
+    restart: unless-stopped # перезапускать контейнер всегда, кроме случая, когда он остановлен вручную.
     ports:
-      - "6379:6379"
-    networks:
-      - monitoring
+      - "6379:6379" # открыть порт 6379 (стандартный для Redis) наружу
+    networks: # подключение к сетям
+      - monitoring # добавить этот контейнер в созданную ранее сеть
 
   prometheus:
     image: prom/prometheus:latest
@@ -25,7 +25,7 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
-    command:
+    command: # переопределение стандартной команды запуска контейнера
       - '--config.file=/etc/prometheus/prometheus.yml'
     networks:
       - monitoring
@@ -39,30 +39,30 @@ services:
       # - ./grafana/provisioning:/etc/grafana/provisioning
     ports:
       - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+    environment: # переменные окружения
+      - GF_SECURITY_ADMIN_PASSWORD=admin # установить стандартный пароль администратора (admin)
     depends_on:
-      - prometheus
+      - prometheus # не запускать Grafana, пока не запустится сервис
     networks:
       - monitoring
 
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: . # искать файлы для сборки в текущей папке.
+      dockerfile: Dockerfile.api # использовать конкретный файл Dockerfile.api для сборки
     container_name: ai-agent-api
     restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
-      - ./political_markers.yml:/app/political_markers.yml:ro
+      - ./political_markers.yml:/app/political_markers.yml:ro # пробросить файл маркеров в режиме «только для чтения» (ro)
     environment:
-      YC_API_KEY: ${YC_API_KEY}
+      YC_API_KEY: ${YC_API_KEY} # передать API-ключ Yandex Cloud из системы/файла .env.
       YC_FOLDER_ID: ${YC_FOLDER_ID}
     depends_on:
-      - ai_classifier
+      - ai_classifier # запускать только после старта контейнера ai_classifier
     env_file:
-      - .env
+      - .env # автоматически загрузить все скрытые переменные из локального файла .env
     networks:
       - monitoring
 
@@ -75,7 +75,7 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - api
+      - api #  запускать только после старта бэкенда (api)
     networks:
       - monitoring
 

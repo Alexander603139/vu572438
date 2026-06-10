@@ -1,8 +1,10 @@
 FROM python:3.10-slim
 
+# отключает интерактивные запросы (вопросы "да/нет") при установке системных пакетов
 ENV DEBIAN_FRONTEND=noninteractive
+# устанавливает системный часовой пояс контейнера в UTC
 ENV TZ=UTC
-
+# создает рабочую папку /app внутри контейнера и переходит в нее
 WORKDIR /app
 
 # Установка системных зависимостей для newspaper3k
@@ -15,6 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# RUN apt-get update && apt-get install -y --no-install-recommends \ — обновляет список пакетов и запускает установку без лишних рекомендуемых зависимостей.
+# tzdata \ — пакет для корректной работы с часовыми поясами.
+# curl \ — утилита для отправки сетевых запросов (часто нужна для проверки здоровья контейнера).
+# libjpeg-dev \ — системная библиотека для работы с картинками JPEG (нужна библиотеке newspaper3k).
+# zlib1g-dev \ — библиотека для сжатия данных.
+# libxml2-dev \ — библиотека для парсинга и работы с XML-документами.
+# libxslt-dev \ — библиотека для обработки XSLT-трансформаций.
+# && rm -rf /var/lib/apt/lists/* — удаляет скачанные установочные файлы, чтобы уменьшить итоговый размер образа.
+    
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -23,4 +34,5 @@ RUN pip install --upgrade pip
 
 EXPOSE 8000
 
+# команда по умолчанию при старте контейнера: запускает ASGI-сервер Uvicorn с вашим приложением API на порту 8000
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
