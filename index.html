@@ -30,6 +30,7 @@
     <button class="tablinks" onclick="openTab(event, 'Single')" id="defaultOpen">Анализ одного текста</button>
     <button class="tablinks" onclick="openTab(event, 'Sites')">Анализ сайтов</button>
     <button class="tablinks" onclick="openTab(event, 'Keywords')">Ключевые фразы</button>
+    <button class="tablinks" onclick="openTab(event, 'Social')">Анализ Telegram</button>
 </div>
 
 <!-- Режим 1: один текст -->
@@ -61,6 +62,16 @@
     <br>
     <button onclick="extractKeywords()">Извлечь ключевые фразы</button>
     <div id="keywordsResult" style="margin-top: 20px;"></div>
+</div>
+
+<div id="Social" class="tabcontent">
+    <h3>Анализ Telegram каналов</h3>
+    <textarea id="channels" placeholder="Введите username каналов (без @) по одному на строку:&#10;durov&#10;meduzalive&#10;rbc"></textarea>
+    <br>
+    <label>Максимум постов на канал: <input type="number" id="maxPosts" value="5" min="1" max="20"></label>
+    <br>
+    <button onclick="analyzeSocial()">Анализировать каналы</button>
+    <div id="socialResult" style="margin-top: 20px;"></div>
 </div>
 
 <script>
@@ -187,6 +198,50 @@ async function extractKeywords() {
                 html += `<li>${phrase}</li>`;
             }
             html += `</ul>`;
+        }
+        resultDiv.innerHTML = html;
+    } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    }
+}
+
+async function analyzeSocial() {
+    const channelsText = document.getElementById('channels').value;
+    const channels = channelsText.split('\n').filter(c => c.trim().length > 0);
+    const maxPosts = parseInt(document.getElementById('maxPosts').value);
+    if (channels.length === 0) return;
+    const resultDiv = document.getElementById('socialResult');
+    resultDiv.innerHTML = 'Анализ выполняется... (может занять несколько минут)';
+    try {
+        const response = await fetch('http://186.246.14.209:8000/analyze_social', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channels: channels, max_posts: maxPosts })
+        });
+        const data = await response.json();
+        let html = '<h3>Результаты по каналам</h3>';
+        for (const item of data.results) {
+            if (item.error) {
+                html += `<div class="error"><strong>${item.channel}</strong>: ${item.error}</div>`;
+                continue;
+            }
+            html += `<details><summary><strong>${item.channel}</strong> (постов: ${item.posts_parsed}, ср. уверенность: ${item.avg_confidence})</summary>`;
+            html += '<table><tr><th>Категория</th><th>%</th></tr>';
+            for (const [cat, perc] of Object.entries(item.distribution)) {
+                html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
+            }
+            html += '</table>';
+            html += '<h4>Посты:</h4><ul>';
+            for (const post of item.posts) {
+                html += `<li><strong><a href="${post.url}" target="_blank">${post.url}</a></strong><br>`;
+                html += `<span class="article-preview">Превью: ${post.preview}</span><br>`;
+                html += `Распределение: `;
+                for (const [cat, perc] of Object.entries(post.distribution)) {
+                    html += `${cat} ${perc}%; `;
+                }
+                html += `<br>Уверенность: ${post.confidence}</li>`;
+            }
+            html += `</ul></details><hr>`;
         }
         resultDiv.innerHTML = html;
     } catch (error) {
