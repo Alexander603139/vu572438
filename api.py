@@ -13,6 +13,7 @@ from newspaper import Article
 import feedparser
 import logging
 import os
+import httpx
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -106,17 +107,34 @@ def extract_text_with_newspaper(html: str, url: str) -> tuple:
     return "", "Не удалось извлечь текст"
 
 
+# async def fetch_article(client, url: str):
+#     try:
+#         resp = await client.get(url, timeout=15.0, follow_redirects=True)
+#         if resp.status_code == 200:
+#             text, preview = extract_text_with_newspaper(resp.text, url)
+#             if text:
+#                 return {"text": text, "preview": preview, "url": url}
+#     except Exception as e:
+#         logger.warning(f"Fetch error {url}: {e}")
+#     return None
+
 async def fetch_article(client, url: str):
     try:
         resp = await client.get(url, timeout=15.0, follow_redirects=True)
         if resp.status_code == 200:
             text, preview = extract_text_with_newspaper(resp.text, url)
-            if text:
-                return {"text": text, "preview": preview, "url": url}
+            # Если текст слишком короткий или сайт из "сложного" списка – пробуем JS
+            if text and len(text) < 500:
+                logger.info(f"Short text ({len(text)}) for {url}, trying JS fallback")
+                js_text = await fetch_via_browser(url)
+                if js_text and len(js_text) > len(text):
+                    text = js_text
+                    preview = ' '.join(text.split()[:10]) + '...'
+            if text and len(text) > 200:
+                return {'text': text[:10000], 'preview': preview, 'url': url}
     except Exception as e:
         logger.warning(f"Fetch error {url}: {e}")
     return None
-
 
 async def fetch_rss_feed(feed_url: str, max_items: int):
     try:
@@ -207,6 +225,22 @@ async def fetch_site_articles(site_url: str, max_articles: int):
             logger.warning(f"Site fetch error {site_url}: {e}")
             return []
 
+async def fetch_via_browser(url: str) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "http://browser:8002/fetch",
+                json={"url": url, "timeout": 10000}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("text", "")
+            else:
+                logger.warning(f"Browser service error: {resp.status_code}")
+                return ""
+    except Exception as e:
+        logger.warning(f"Browser service exception: {e}")
+        return ""
 
 @app.post("/analyze_sites")
 async def analyze_sites(request: SitesRequest):

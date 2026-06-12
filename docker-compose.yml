@@ -98,3 +98,14 @@ services:
       - .env
     networks:
       - monitoring
+
+  browser:
+    build:
+      context: .
+      dockerfile: Dockerfile.browser
+    container_name: ai-agent-browser
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    networks:
+      - monitoring

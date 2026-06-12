@@ -11,3 +11,4 @@ lxml_html_clean
 pyyaml==6.0.1
 prometheus-client
 aioredis
+playwright==1.46.0
