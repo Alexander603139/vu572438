@@ -147,18 +147,48 @@ async function analyzeSites() {
         });
         const data = await response.json();
         let html = '<h3>Результаты по сайтам</h3>';
+        // **** вывод в одну строку ***
+        // for (const item of data.results) {
+        //     if (item.error) {
+        //         html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
+        //         continue;
+        //     }
+        //     const avgConf = item.avg_confidence !== undefined ? `, ср. уверенность: ${item.avg_confidence}` : '';
+        //     html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed}${avgConf})</summary>`;
+        //     html += '</table><tr><th>Категория</th><th>%</th></tr>';
+        //     for (const [cat, perc] of Object.entries(item.distribution)) {
+        //         html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
+        //     }
+        //     html += '</table>';
+        //     html += '<h4>Статьи:</h4><ul>';
+        //     for (const art of item.articles) {
+        //         html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
+        //         html += `<span class="article-preview">Превью: ${art.preview}</span><br>`;
+        //         html += `Распределение: `;
+        //         for (const [cat, perc] of Object.entries(art.distribution)) {
+        //             html += `${cat} ${perc}%; `;
+        //         }
+        //         const conf = art.confidence !== undefined ? `<br>Уверенность: ${art.confidence}` : '';
+        //         html += `${conf}</li>`;
+        //     }
+        //     html += `</ul></details><hr>`;
+        // }
         for (const item of data.results) {
             if (item.error) {
                 html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
                 continue;
             }
-            const avgConf = item.avg_confidence !== undefined ? `, ср. уверенность: ${item.avg_confidence}` : '';
-            html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed}${avgConf})</summary>`;
-            html += '</table><tr><th>Категория</th><th>%</th></tr>';
-            for (const [cat, perc] of Object.entries(item.distribution)) {
-                html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
+            // Формируем текстовый блок, как для одного текста
+            let distText = `<strong>Результат классификации:</strong><br>`;
+            const categoriesOrder = ["Экономические левые", "Экономические правые", "Социально-либертарные", "Социально-авторитарные"];
+            for (const cat of categoriesOrder) {
+                const perc = item.distribution[cat] || 0;
+                distText += `  ${cat}: ${perc}%<br>`;
             }
-            html += '</table>';
+            distText += `Уверенность ИИ: ${item.avg_confidence}<br>`;
+
+            html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed})</summary>`;
+            html += `<div style="margin: 10px 0;">${distText}</div>`;
             html += '<h4>Статьи:</h4><ul>';
             for (const art of item.articles) {
                 html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
@@ -167,8 +197,7 @@ async function analyzeSites() {
                 for (const [cat, perc] of Object.entries(art.distribution)) {
                     html += `${cat} ${perc}%; `;
                 }
-                const conf = art.confidence !== undefined ? `<br>Уверенность: ${art.confidence}` : '';
-                html += `${conf}</li>`;
+                html += `<br>Уверенность: ${art.confidence}</li>`;
             }
             html += `</ul></details><hr>`;
         }
