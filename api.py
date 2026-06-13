@@ -5,7 +5,6 @@ from typing import List, Dict
 import subprocess
 import httpx
 from bs4 import BeautifulSoup
-from telegram_parser import fetch_telegram_posts
 import asyncio
 import re
 from collections import defaultdict
@@ -42,10 +41,6 @@ class SitesRequest(BaseModel):
 class KeywordsRequest(BaseModel):
     text: str
     max_per_category: int = 5
-
-class SocialRequest(BaseModel):
-    channels: List[str]   # список username (без @) или полных ссылок
-    max_posts: int = 5
 
 @app.post("/classify")
 async def classify(request: TextRequest):
@@ -341,111 +336,6 @@ async def analyze_sites(request: SitesRequest):
                 "avg_confidence": avg_confidence,
             }
         )
-    return {"results": results}
-
-@app.post("/analyze_social")
-async def analyze_social(request: SocialRequest):
-    from collections import defaultdict
-    results = []
-    for channel in request.channels:
-        # Нормализуем: если ссылка вида https://t.me/username, извлекаем username
-        channel_str = channel.strip().rstrip('/')
-        if channel_str.startswith('https://t.me/'):
-            username = channel_str.split('/')[-1]
-        elif channel_str.startswith('@'):
-            username = channel_str[1:]
-        else:
-            username = channel_str
-        try:
-            posts = await fetch_telegram_posts(username, request.max_posts)
-        except Exception as e:
-            logger.error(f"Telegram fetch error for {channel}: {e}")
-            results.append({
-                "channel": channel,
-                "error": str(e),
-                "posts_parsed": 0,
-                "distribution": {},
-                "posts": [],
-                "avg_confidence": 0.0
-            })
-            continue
-        if not posts:
-            results.append({
-                "channel": channel,
-                "error": "Не найдено постов (канал пуст или недоступен)",
-                "posts_parsed": 0,
-                "distribution": {},
-                "posts": [],
-                "avg_confidence": 0.0
-            })
-            continue
-
-        posts_result = []
-        total_counts = defaultdict(int)
-        total_confidence = 0.0
-
-        for post in posts:
-            text = post['text']
-            preview = post['preview']
-
-            # Вызываем классификатор
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.post(
-                        "http://ai_classifier:8001/classify",
-                        json={"text": text}
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        output = data.get("result", "")
-                    else:
-                        output = ""
-            except Exception as e:
-                logger.error(f"Classification error for {post['url']}: {e}")
-                output = ""
-
-            # Парсим результат
-            dist = {}
-            confidence = 0.0
-            for line in output.split('\n'):
-                if ':' in line and '%' in line:
-                    parts = line.split(':')
-                    if len(parts) == 2:
-                        cat = parts[0].strip()
-                        try:
-                            percent = float(parts[1].replace('%', '').strip())
-                            dist[cat] = percent
-                            total_counts[cat] += percent
-                        except:
-                            pass
-                elif 'Уверенность ИИ:' in line:
-                    try:
-                        confidence = float(line.split(':')[1].strip())
-                    except:
-                        pass
-            total_confidence += confidence
-            posts_result.append({
-                "url": post['url'],
-                "preview": preview,
-                "distribution": dist,
-                "confidence": confidence
-            })
-
-        # Агрегируем распределение по всем постам
-        if total_counts:
-            total = sum(total_counts.values())
-            norm = {cat: round(val / total * 100, 1) for cat, val in total_counts.items()} if total > 0 else {}
-        else:
-            norm = {}
-        avg_confidence = round(total_confidence / len(posts), 2) if posts else 0.0
-
-        results.append({
-            "channel": channel,
-            "posts_parsed": len(posts),
-            "distribution": norm,
-            "posts": posts_result,
-            "avg_confidence": avg_confidence
-        })
     return {"results": results}
 
 @app.get("/health")
