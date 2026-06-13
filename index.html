@@ -39,6 +39,7 @@
     <textarea id="singleText" placeholder="Вставьте текст новости или статьи..."></textarea>
     <br>
     <button onclick="analyzeSingle()">Анализировать</button>
+    <button onclick="exportSingleToCSV()" style="background: green;">Экспорт в CSV</button>
     <div id="singleResult" style="margin-top: 20px;"></div>
 </div>
 
@@ -50,6 +51,7 @@
     <label>Максимум статей на сайт: <input type="number" id="maxArticles" value="5" min="1" max="10"></label>
     <br>
     <button onclick="analyzeSites()">Анализировать сайты</button>
+    <button onclick="exportSingleToCSV()" style="background: green;">Экспорт в CSV</button>
     <div id="sitesResult" style="margin-top: 20px;"></div>
 </div>
 
@@ -276,6 +278,85 @@ async function analyzeSocial() {
     } catch (error) {
         resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
     }
+}
+
+function exportSingleToCSV() {
+    const resultDiv = document.getElementById('singleResult');
+    const preElement = resultDiv.querySelector('pre');
+    if (!preElement) {
+        alert('Нет результатов для экспорта. Сначала проанализируйте текст.');
+        return;
+    }
+    const resultText = preElement.textContent;
+    const csvRows = [['Результат классификации']];
+    csvRows.push([resultText]);
+    const csvContent = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', 'classification_result.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function exportSitesToCSV() {
+    const sitesResultDiv = document.getElementById('sitesResult');
+    const detailsElements = sitesResultDiv.querySelectorAll('details');
+    if (detailsElements.length === 0) {
+        alert('Нет результатов для экспорта. Сначала выполните анализ сайтов.');
+        return;
+    }
+    const csvRows = [['Сайт', 'Категория', 'Процент', 'Уверенность', 'Статья URL', 'Превью']];
+    for (const detail of detailsElements) {
+        const summary = detail.querySelector('summary strong');
+        const siteName = summary ? summary.textContent : 'Неизвестно';
+        const distributionTable = detail.querySelector('table');
+        const categories = [];
+        const percentages = [];
+        if (distributionTable) {
+            const rows = distributionTable.querySelectorAll('tr');
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].querySelectorAll('td');
+                if (cells.length >= 2) {
+                    categories.push(cells[0].textContent);
+                    percentages.push(cells[1].textContent.replace('%', ''));
+                }
+            }
+        }
+        const avgConfidenceMatch = summary.parentNode.textContent.match(/ср\. уверенность: ([0-9.]+)/);
+        const avgConfidence = avgConfidenceMatch ? avgConfidenceMatch[1] : '';
+        const articles = detail.querySelectorAll('ul li');
+        for (const article of articles) {
+            const articleLink = article.querySelector('a');
+            const articleUrl = articleLink ? articleLink.href : '';
+            const previewSpan = article.querySelector('.article-preview');
+            const preview = previewSpan ? previewSpan.textContent.replace('Превью: ', '') : '';
+            // Добавляем строку для каждой статьи, повторяя категории
+            for (let i = 0; i < categories.length; i++) {
+                csvRows.push([
+                    siteName,
+                    categories[i],
+                    percentages[i],
+                    avgConfidence,
+                    articleUrl,
+                    preview
+                ]);
+            }
+        }
+    }
+    const csvContent = csvRows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', 'sites_analysis.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 </script>
 </body>
