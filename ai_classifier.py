@@ -76,6 +76,12 @@ async def startup():
     global redis_client
     redis_client = await aioredis.from_url(redis_url, decode_responses=True)
     logger.info("Redis connected")
+    # Если ключ samples:all отсутствует, загружаем из YAML
+    if not await redis_client.exists("samples:all"):
+        await load_samples_from_yaml_to_redis()
+    # Если ключ markers:all отсутствует, загружаем
+    if not await redis_client.exists("markers:all"):
+        await load_markers_from_yaml_to_redis()
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -90,6 +96,13 @@ async def query_yandexgpt(text: str) -> dict:
         logger.info("Cache hit")
         return json.loads(cached)
     logger.info("Cache miss, calling YandexGPT")
+    # Получаем samples из Redis
+    samples_json = await redis_client.get("samples:all")
+    if samples_json:
+        samples = json.loads(samples_json)
+    else:
+        # fallback: загружаем из YAML и сохраняем в Redis
+        samples = await load_samples_from_yaml_to_redis()
     payload = {
         "modelUri": f"cls://{FOLDER_ID}/yandexgpt/rc",
         "taskDescription": "Определи политическую ориентацию текста. Категории: Экономические левые, Экономические правые, Социально-либертарные, Социально-авторитарные.",
@@ -125,6 +138,45 @@ async def query_yandexgpt(text: str) -> dict:
         # Сохраняем в кэш на 1 час (3600 секунд)
         await redis_client.setex(cache_key, 3600, json.dumps(data))
         return data
+    
+# --- Загрузка samples и маркеров из YAML в Redis ---
+async def load_samples_from_yaml_to_redis():
+    samples_dir = Path("/app/samples")
+    label_map = {
+        "economic_left.yml": "Экономические левые",
+        "economic_right.yml": "Экономические правые",
+        "social_liberal.yml": "Социально-либертарные",
+        "social_authoritarian.yml": "Социально-авторитарные"
+    }
+    all_samples = []
+    for filename, label in label_map.items():
+        filepath = samples_dir / filename
+        if filepath.exists():
+            with open(filepath, 'r', encoding='utf-8') as f:
+                texts = yaml.safe_load(f)
+                for text in texts:
+                    all_samples.append({"text": text, "label": label})
+        else:
+            logger.warning(f"Samples file not found: {filepath}")
+    # Сохраняем в Redis
+    await redis_client.set("samples:all", json.dumps(all_samples))
+    logger.info(f"Loaded {len(all_samples)} samples into Redis")
+    return all_samples
+
+async def load_markers_from_yaml_to_redis():
+    markers_path = Path("/app/political_markers.yml")
+    if markers_path.exists():
+        with open(markers_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        markers = {}
+        for cat, cat_data in data['categories'].items():
+            markers[cat_data['name']] = cat_data['markers']
+        await redis_client.set("markers:all", json.dumps(markers))
+        logger.info("Loaded markers into Redis")
+        return markers
+    else:
+        logger.warning("political_markers.yml not found")
+        return {}
 
 @app.post("/classify")
 async def classify(request: TextRequest):
