@@ -30,6 +30,7 @@
     <button class="tablinks" onclick="openTab(event, 'Single')" id="defaultOpen">Анализ одного текста</button>
     <button class="tablinks" onclick="openTab(event, 'Sites')">Анализ сайтов</button>
     <button class="tablinks" onclick="openTab(event, 'Keywords')">Ключевые фразы</button>
+    <button class="tablinks" onclick="openTab(event, 'Admin')">Администрирование</button>
 </div>
 
 <!-- Режим 1: один текст -->
@@ -63,6 +64,24 @@
     <br>
     <button onclick="extractKeywords()">Извлечь ключевые фразы</button>
     <div id="keywordsResult" style="margin-top: 20px;"></div>
+</div>
+
+<!-- Вкладка администрирования -->
+<div id="Admin" class="tabcontent">
+    <h3>Добавление few-shot примера</h3>
+    <label>Категория:</label>
+    <select id="exampleCategory">
+        <option value="economic_left">Экономические левые</option>
+        <option value="economic_right">Экономические правые</option>
+        <option value="social_liberal">Социально-либертарные</option>
+        <option value="social_authoritarian">Социально-авторитарные</option>
+    </select>
+    <br><br>
+    <label>Текст примера:</label><br>
+    <textarea id="exampleText" rows="4" cols="50" placeholder="Введите предложение, характерное для выбранной категории..."></textarea>
+    <br>
+    <button onclick="addExample()">Добавить пример</button>
+    <div id="adminResult" style="margin-top: 20px;"></div>
 </div>
 
 <script>
@@ -302,6 +321,38 @@ function exportSitesToCSV() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+async function addExample() {
+    const category = document.getElementById('exampleCategory').value;
+    const text = document.getElementById('exampleText').value.trim();
+    if (!text) {
+        alert('Введите текст примера');
+        return;
+    }
+    const resultDiv = document.getElementById('adminResult');
+    resultDiv.innerHTML = 'Отправка...';
+    try {
+        // Используем Basic Auth (логин: admin, пароль: admin123)
+        const auth = btoa('admin:admin123');
+        const response = await fetch('http://186.246.14.209:8000/admin/add_example', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${auth}`
+            },
+            body: JSON.stringify({ category: category, text: text })
+        });
+        if (response.ok) {
+            resultDiv.innerHTML = '<span style="color: green;">Пример успешно добавлен!</span>';
+            document.getElementById('exampleText').value = ''; // очистить поле
+        } else {
+            const error = await response.text();
+            resultDiv.innerHTML = `<span style="color: red;">Ошибка: ${error}</span>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<span style="color: red;">Ошибка: ${error.message}</span>`;
+    }
 }
 </script>
 </body>
