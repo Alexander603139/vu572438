@@ -13,15 +13,21 @@ import feedparser
 import logging
 import os
 import httpx
+import yaml
+from pathlib import Path
+import httpx
+from fastapi.security import HTTPBasic, HTTPBasicCredential
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLASSIFIER_PATH = os.path.join(BASE_DIR, "classifier.py")
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin123"
 
 app = FastAPI()
-
+security = HTTPBasic()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,6 +47,21 @@ class SitesRequest(BaseModel):
 class KeywordsRequest(BaseModel):
     text: str
     max_per_category: int = 5
+
+class AddExampleRequest(BaseModel):
+    category: str
+    text: str
+
+def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials.username != ADMIN_USER or credentials.password != ADMIN_PASS:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+@app.post("/admin/add_example")
+async def admin_add_example(    category: str, text: str, auth: bool = Depends(verify_admin)):
+    # category ожидается как 'economic_left' и т.д.
+    await add_example_to_yaml_and_redis(category, text)
+    return {"status": "ok"}
 
 @app.post("/classify")
 async def classify(request: TextRequest):
@@ -236,6 +257,33 @@ async def fetch_via_browser(url: str) -> str:
     except Exception as e:
         logger.warning(f"Browser service exception: {e}")
         return ""
+
+async def add_example_to_yaml_and_redis(category_key: str, text: str):
+    """
+    category_key: 'economic_left', 'economic_right', 'social_liberal', 'social_authoritarian'
+    text: предложение для добавления в few-shot примеры
+    """
+    # 1. Запись в YAML-файл
+    filename = f"/app/samples/{category_key}.yml"  # путь внутри контейнера
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            examples = yaml.safe_load(f) or []
+    except FileNotFoundError:
+        examples = []
+    if text not in examples:
+        examples.append(text)
+        with open(filename, 'w', encoding='utf-8') as f:
+            yaml.dump(examples, f, allow_unicode=True, default_flow_style=False)
+    else:
+        # Уже есть – не добавляем
+        return
+
+    # 2. Обновляем Redis через вызов ai_classifier (чтобы перезагрузить samples)
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post("http://ai_classifier:8001/admin/reload_samples")
+    except Exception as e:
+        print(f"Failed to reload samples in ai_classifier: {e}")
 
 @app.post("/analyze_sites")
 async def analyze_sites(request: SitesRequest):

@@ -271,6 +271,11 @@ async def extract_keywords(request: KeywordsRequest):
 async def metrics():
     return Response(content=generate_latest(REGISTRY), media_type="text/plain")
 
+@app.post("/admin/reload_samples")
+async def reload_samples():
+    await load_samples_from_yaml_to_redis()
+    return {"status": "ok"}
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
