@@ -71,18 +71,6 @@ for filename, label in label_map.items():
 redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
 redis_client = None
 
-@app.on_event("startup")
-async def startup():
-    global redis_client
-    redis_client = await aioredis.from_url(redis_url, decode_responses=True)
-    logger.info("Redis connected")
-    # Если ключ samples:all отсутствует, загружаем из YAML
-    if not await redis_client.exists("samples:all"):
-        await load_samples_from_yaml_to_redis()
-    # Если ключ markers:all отсутствует, загружаем
-    if not await redis_client.exists("markers:all"):
-        await load_markers_from_yaml_to_redis()
-
 @app.on_event("shutdown")
 async def shutdown():
     if redis_client:
@@ -178,6 +166,18 @@ async def load_markers_from_yaml_to_redis():
         logger.warning("political_markers.yml not found")
         return {}
 
+@app.on_event("startup")
+async def startup():
+    global redis_client
+    redis_client = await aioredis.from_url(redis_url, decode_responses=True)
+    logger.info("Redis connected")
+    # Если ключ samples:all отсутствует, загружаем из YAML
+    if not await redis_client.exists("samples:all"):
+        await load_samples_from_yaml_to_redis()
+    # Если ключ markers:all отсутствует, загружаем
+    if not await redis_client.exists("markers:all"):
+        await load_markers_from_yaml_to_redis()
+
 @app.post("/classify")
 async def classify(request: TextRequest):
     try:
@@ -243,7 +243,6 @@ async def extract_keywords_with_categories(text: str, max_per_category: int) -> 
         result = resp.json()
         response_text = result['result']['alternatives'][0]['message']['text']
         # Извлекаем JSON из ответа (модель может добавить пояснения)
-        import json
         # Ищем первую '{' и последнюю '}'
         start = response_text.find('{')
         end = response_text.rfind('}') + 1

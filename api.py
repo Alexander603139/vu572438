@@ -12,11 +12,10 @@ from newspaper import Article
 import feedparser
 import logging
 import os
-import httpx
 import yaml
 from pathlib import Path
-import httpx
-from fastapi.security import HTTPBasic, HTTPBasicCredential
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Depends
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -58,9 +57,8 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     return True
 
 @app.post("/admin/add_example")
-async def admin_add_example(    category: str, text: str, auth: bool = Depends(verify_admin)):
-    # category ожидается как 'economic_left' и т.д.
-    await add_example_to_yaml_and_redis(category, text)
+async def admin_add_example(request: AddExampleRequest, auth: bool = Depends(verify_admin)):
+    await add_example_to_yaml_and_redis(request.category, request.text)
     return {"status": "ok"}
 
 @app.post("/classify")
