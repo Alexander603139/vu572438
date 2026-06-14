@@ -56,6 +56,7 @@ services:
       - "8000:8000"
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro # пробросить файл маркеров в режиме «только для чтения» (ro)
+      - ./samples:/app/samples
     environment:
       YC_API_KEY: ${YC_API_KEY} # передать API-ключ Yandex Cloud из системы/файла .env.
       YC_FOLDER_ID: ${YC_FOLDER_ID}
