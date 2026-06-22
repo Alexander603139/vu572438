@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Политический классификатор</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial; max-width: 1000px; margin: 50px auto; padding: 20px; }
+        .tab { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .tab button { background-color: gainsboro; float: left; border: none; outline: none; cursor: pointer; padding: 10px 20px; transition: 0.3s; font-size: 16px; }
+        .tab button:hover { background-color: #aad; }
+        .tab button.active { background-color: blueviolet; color: white; }
+        .tabcontent { display: none; }
+        textarea { width: 100%; height: 150px; padding: 10px; }
+        input[type="number"] { width: 80px; }
+        button { padding: 10px 20px; background: blueviolet; color: white; border: none; cursor: pointer; margin-top: 10px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: top; }
+        th { background-color: #f2f2f2; }
+        .error { color: red; }
+        .article-preview { font-size: 12px; color: #555; margin-top: 5px; }
+        details { margin-bottom: 10px; }
+        summary { cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h1>Политический классификатор текста и новостных сайтов</h1>
+
+<div class="tab">
+    <button class="tablinks" onclick="openTab(event, 'Single')" id="defaultOpen">Анализ одного текста</button>
+    <button class="tablinks" onclick="openTab(event, 'Sites')">Анализ сайтов</button>
+    <button class="tablinks" onclick="openTab(event, 'Keywords')">Ключевые фразы</button>
+    <button class="tablinks" onclick="openTab(event, 'Admin')">Администрирование</button>
+</div>
+
+<!-- Режим 1: один текст -->
+<div id="Single" class="tabcontent">
+    <h3>Введите текст для анализа</h3>
+    <textarea id="singleText" placeholder="Вставьте текст новости или статьи..."></textarea>
+    <br>
+    <button onclick="analyzeSingle()">Анализировать</button>
+    <button onclick="exportSingleToCSV()" style="background: green;">Экспорт в CSV</button>
+    <div id="singleResult" style="margin-top: 20px;"></div>
+</div>
+
+<!-- Режим 2: список сайтов -->
+<div id="Sites" class="tabcontent">
+    <h3>Введите список URL (по одному на строку)</h3>
+    <textarea id="urls" placeholder="https://ria.ru&#10;https://meduza.io&#10;https://tass.ru"></textarea>
+    <br>
+    <label>Максимум статей на сайт: <input type="number" id="maxArticles" value="5" min="1" max="10"></label>
+    <br>
+    <button onclick="analyzeSites()">Анализировать сайты</button>
+    <button onclick="exportSitesToCSV()" style="background: green;">Экспорт в CSV</button>
+    <div id="sitesResult" style="margin-top: 20px;"></div>
+</div>
+
+<!-- Новый tabcontent -->
+<div id="Keywords" class="tabcontent">
+    <h3>Выделение ключевых фраз по категориям</h3>
+    <textarea id="keywordsText" placeholder="Вставьте текст..."></textarea>
+    <br>
+    <label>Максимум фраз на категорию: <input type="number" id="maxKeywords" value="5" min="1" max="10"></label>
+    <br>
+    <button onclick="extractKeywords()">Извлечь ключевые фразы</button>
+    <div id="keywordsResult" style="margin-top: 20px;"></div>
+</div>
+
+<!-- Вкладка администрирования -->
+<div id="Admin" class="tabcontent">
+    <h3>Добавление few-shot примера</h3>
+    <label>Категория:</label>
+    <select id="exampleCategory">
+        <option value="economic_left">Экономические левые</option>
+        <option value="economic_right">Экономические правые</option>
+        <option value="social_liberal">Социально-либертарные</option>
+        <option value="social_authoritarian">Социально-авторитарные</option>
+    </select>
+    <br><br>
+    <label>Текст примера:</label><br>
+    <textarea id="exampleText" rows="4" cols="50" placeholder="Введите предложение, характерное для выбранной категории..."></textarea>
+    <br>
+    <button onclick="addExample()">Добавить пример</button>
+    <div id="adminResult" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+function openTab(evt, tabName) {
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+document.getElementById("defaultOpen").click();
+
+async function analyzeSingle() {
+    const text = document.getElementById('singleText').value;
+    if (!text.trim()) {
+        document.getElementById('singleResult').innerHTML = '<span class="error">Введите текст для анализа</span>';
+        return;
+    }
+
+    const resultDiv = document.getElementById('singleResult');
+    resultDiv.innerHTML = 'Анализ...';
+
+    try {
+        const response = await fetch('http://186.246.14.209:8000/classify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        });
+
+        // Проверяем, успешен ли ответ
+        if (!response.ok) {
+            let errorMsg = `Ошибка сервера: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.detail || errorMsg;
+            } catch (e) {
+                // если ответ не JSON
+                errorMsg = await response.text() || errorMsg;
+            }
+            throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        
+        // Очищаем и выводим результат
+        resultDiv.innerHTML = '';
+        const preElement = document.createElement('pre');
+        preElement.textContent = data.result;
+        resultDiv.appendChild(preElement);
+        
+    } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    }
+}
+
+async function analyzeSites() {
+    const urlsText = document.getElementById('urls').value;
+    const urls = urlsText.split('\n').filter(u => u.trim().length > 0);
+    const maxArticles = parseInt(document.getElementById('maxArticles').value);
+    if (urls.length === 0) return;
+    document.getElementById('sitesResult').innerHTML = 'Анализ выполняется... (может занять несколько минут)';
+    try {
+        const response = await fetch('http://186.246.14.209:8000/analyze_sites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: urls, max_articles_per_site: maxArticles })
+        });
+        const data = await response.json();
+        let html = '<h3>Результаты по сайтам</h3>';
+        // **** вывод в одну строку ***
+        // for (const item of data.results) {
+        //     if (item.error) {
+        //         html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
+        //         continue;
+        //     }
+        //     const avgConf = item.avg_confidence !== undefined ? `, ср. уверенность: ${item.avg_confidence}` : '';
+        //     html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed}${avgConf})</summary>`;
+        //     html += '</table><tr><th>Категория</th><th>%</th></tr>';
+        //     for (const [cat, perc] of Object.entries(item.distribution)) {
+        //         html += `<tr><td>${cat}</td><td>${perc}%</td></tr>`;
+        //     }
+        //     html += '</table>';
+        //     html += '<h4>Статьи:</h4><ul>';
+        //     for (const art of item.articles) {
+        //         html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
+        //         html += `<span class="article-preview">Превью: ${art.preview}</span><br>`;
+        //         html += `Распределение: `;
+        //         for (const [cat, perc] of Object.entries(art.distribution)) {
+        //             html += `${cat} ${perc}%; `;
+        //         }
+        //         const conf = art.confidence !== undefined ? `<br>Уверенность: ${art.confidence}` : '';
+        //         html += `${conf}</li>`;
+        //     }
+        //     html += `</ul></details><hr>`;
+        // }
+        for (const item of data.results) {
+            if (item.error) {
+                html += `<div class="error"><strong>${item.url}</strong>: ${item.error}</div>`;
+                continue;
+            }
+            // Формируем текстовый блок, как для одного текста
+            let distText = `<strong>Результат классификации:</strong><br>`;
+            const categoriesOrder = ["Экономические левые", "Экономические правые", "Социально-либертарные", "Социально-авторитарные"];
+            for (const cat of categoriesOrder) {
+                const perc = item.distribution[cat] || 0;
+                distText += `  ${cat}: ${perc}%<br>`;
+            }
+            distText += `Уверенность ИИ: ${item.avg_confidence}<br>`;
+
+            html += `<details><summary><strong>${item.url}</strong> (статей: ${item.articles_parsed})</summary>`;
+            html += `<div style="margin: 10px 0;">${distText}</div>`;
+            html += '<h4>Статьи:</h4><ul>';
+            for (const art of item.articles) {
+                html += `<li><strong><a href="${art.url}" target="_blank">${art.url}</a></strong><br>`;
+                html += `<span class="article-preview">Превью: ${art.preview}</span><br>`;
+                html += `Распределение: `;
+                for (const [cat, perc] of Object.entries(art.distribution)) {
+                    html += `${cat} ${perc}%; `;
+                }
+                html += `<br>Уверенность: ${art.confidence}</li>`;
+            }
+            html += `</ul></details><hr>`;
+        }
+        document.getElementById('sitesResult').innerHTML = html;
+    } catch (error) {
+        document.getElementById('sitesResult').innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    }
+}
+
+async function extractKeywords() {
+    const text = document.getElementById('keywordsText').value;
+    const maxPerCategory = parseInt(document.getElementById('maxKeywords').value);
+    if (!text.trim()) return;
+    const resultDiv = document.getElementById('keywordsResult');
+    resultDiv.innerHTML = 'Извлечение...';
+    try {
+        const response = await fetch('http://186.246.14.209:8000/keywords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text, max_per_category: maxPerCategory })
+        });
+        const data = await response.json();
+        let html = '<h3>Ключевые фразы по категориям:</h3>';
+        for (const [cat, phrases] of Object.entries(data.keywords)) {
+            html += `<strong>${cat}</strong><ul>`;
+            for (const phrase of phrases) {
+                html += `<li>${phrase}</li>`;
+            }
+            html += `</ul>`;
+        }
+        resultDiv.innerHTML = html;
+    } catch (error) {
+        resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+    }
+}
+
+function exportSingleToCSV() {
+    const resultDiv = document.getElementById('singleResult');
+    const preElement = resultDiv.querySelector('pre');
+    if (!preElement) {
+        alert('Нет результатов для экспорта. Сначала проанализируйте текст.');
+        return;
+    }
+    const resultText = preElement.textContent;
+    const csvRows = [['Результат классификации']];
+    csvRows.push([resultText]);
+    const csvContent = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', 'classification_result.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function exportSitesToCSV() {
+    const sitesResultDiv = document.getElementById('sitesResult');
+    const detailsElements = sitesResultDiv.querySelectorAll('details');
+    if (detailsElements.length === 0) {
+        alert('Нет результатов для экспорта. Сначала выполните анализ сайтов.');
+        return;
+    }
+    const csvRows = [['Сайт', 'Категория', 'Процент', 'Уверенность', 'Статья URL', 'Превью']];
+    for (const detail of detailsElements) {
+        const summary = detail.querySelector('summary strong');
+        const siteName = summary ? summary.textContent : 'Неизвестно';
+        const distributionTable = detail.querySelector('table');
+        const categories = [];
+        const percentages = [];
+        if (distributionTable) {
+            const rows = distributionTable.querySelectorAll('tr');
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].querySelectorAll('td');
+                if (cells.length >= 2) {
+                    categories.push(cells[0].textContent);
+                    percentages.push(cells[1].textContent.replace('%', ''));
+                }
+            }
+        }
+        const avgConfidenceMatch = summary.parentNode.textContent.match(/ср\. уверенность: ([0-9.]+)/);
+        const avgConfidence = avgConfidenceMatch ? avgConfidenceMatch[1] : '';
+        const articles = detail.querySelectorAll('ul li');
+        for (const article of articles) {
+            const articleLink = article.querySelector('a');
+            const articleUrl = articleLink ? articleLink.href : '';
+            const previewSpan = article.querySelector('.article-preview');
+            const preview = previewSpan ? previewSpan.textContent.replace('Превью: ', '') : '';
+            // Добавляем строку для каждой статьи, повторяя категории
+            for (let i = 0; i < categories.length; i++) {
+                csvRows.push([
+                    siteName,
+                    categories[i],
+                    percentages[i],
+                    avgConfidence,
+                    articleUrl,
+                    preview
+                ]);
+            }
+        }
+    }
+    const csvContent = csvRows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', 'sites_analysis.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+async function addExample() {
+    const category = document.getElementById('exampleCategory').value;
+    const text = document.getElementById('exampleText').value.trim();
+    if (!text) {
+        alert('Введите текст примера');
+        return;
+    }
+    const resultDiv = document.getElementById('adminResult');
+    resultDiv.innerHTML = 'Отправка...';
+    try {
+        // Используем Basic Auth (логин: admin, пароль: admin123)
+        const auth = btoa('admin:admin123');
+        const response = await fetch('http://186.246.14.209:8000/admin/add_example', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${auth}`
+            },
+            body: JSON.stringify({ category: category, text: text })
+        });
+        if (response.ok) {
+            resultDiv.innerHTML = '<span style="color: green;">Пример успешно добавлен!</span>';
+            document.getElementById('exampleText').value = ''; // очистить поле
+        } else {
+            const error = await response.text();
+            resultDiv.innerHTML = `<span style="color: red;">Ошибка: ${error}</span>`;
+        }
+    } catch (error) {
+        resultDiv.innerHTML = `<span style="color: red;">Ошибка: ${error.message}</span>`;
+    }
+}
+</script>
+</body>
+</html>
