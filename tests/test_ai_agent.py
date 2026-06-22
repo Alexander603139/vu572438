@@ -19,7 +19,9 @@ class TestClassify:
         text = "Необходимо снизить налоги и приватизировать госпредприятия."
         resp = api_session.post(f"{base_url}/classify", json={"text": text})
         assert resp.status_code == 200
-        result = resp.json()["result"]
+        data = resp.json()
+        assert "result" in data
+        result = data["result"]
         assert "Экономические правые: 100.0%" in result or "Экономические правые: 100%" in result
 
     def test_extract_keywords(self, base_url, api_session):
