@@ -1,11 +1,21 @@
-# Используем официальный образ с конкретной версией Playwright и ОС
-FROM mcr.microsoft.com/playwright/python:v1.46.0-jammy
+FROM python:3.10-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
-# Устанавливаем только дополнительные зависимости (FastAPI, uvicorn)
+# Установка зависимостей для Playwright (библиотеки ОС)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Установка Python-зависимостей
 COPY requirements.browser.txt .
 RUN pip install --no-cache-dir -r requirements.browser.txt
+
+# Установка браузера Chromium с кэшированием в отдельный слой
+RUN playwright install chromium
 
 # Копируем код
 COPY browser_service.py .
