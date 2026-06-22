@@ -5,6 +5,11 @@ from pydantic import BaseModel
 from playwright.async_api import async_playwright, Browser, Playwright
 import logging
 
+# Браузер создаётся один раз при старте приложения и переиспользуется.
+# Для каждого запроса создаётся новая страница в том же браузере (это быстро и легковесно).
+# Удалены навигационные элементы (header, footer, nav, aside, реклама), 
+# извлекается очищенный текст из body (или main), обрезается до 10k символов
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
