@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import uvicorn
 
 # Сторонние библиотеки
 from bs4 import BeautifulSoup
@@ -21,6 +22,7 @@ from fastapi import (
     FastAPI,
     HTTPException,
     status,
+    Query,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -472,18 +474,13 @@ async def analyze_sites_generator(urls: List[str], max_articles_per_site: int):
     yield "event: done\ndata: " + json.dumps({'status': 'ok'}) + "\n\n"
 
 @app.get("/analyze_sites_stream")
-async def analyze_sites_stream(urls: List[str], max_articles_per_site: int = 5):
+async def analyze_sites_stream(urls: List[str] = Query(...), max_articles_per_site: int = 5):
     """SSE-поток для анализа сайтов с прогрессом"""
-    return StreamingResponse(
-        analyze_sites_generator(urls, max_articles_per_site),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(analyze_sites_generator(urls, max_articles_per_site), media_type="text/event-stream")
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)
