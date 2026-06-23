@@ -332,6 +332,35 @@ function exportSitesCSV() {
 }
 
 // ========== ВКЛАДКА "КЛЮЧЕВЫЕ ФРАЗЫ" ==========
+// async function extractKeywords() {
+//     const text = document.getElementById('keywordsText').value.trim();
+//     if (!text) {
+//         document.getElementById('keywordsResult').innerHTML = '<span class="error">Введите текст для анализа.</span>';
+//         return;
+//     }
+//     const maxPerCategory = parseInt(document.getElementById('maxKeywords').value) || 5;
+//     const resultDiv = document.getElementById('keywordsResult');
+//     resultDiv.innerHTML = 'Извлечение...';
+//     try {
+//         const data = await handleFetch(API_BASE + '/keywords', {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ text, max_per_category: maxPerCategory })
+//         });
+//         let html = '<h3>Ключевые фразы по категориям:</h3>';
+//         for (let [cat, phrases] of Object.entries(data.keywords)) {
+//             html += `<strong>${cat}</strong><ul>`;
+//             for (let phrase of phrases) {
+//                 html += `<li>${phrase}</li>`;
+//             }
+//             html += `</ul>`;
+//         }
+//         resultDiv.innerHTML = html;
+//         window._keywordsData = data;
+//     } catch (error) {
+//         resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
+//     }
+// }
 async function extractKeywords() {
     const text = document.getElementById('keywordsText').value.trim();
     if (!text) {
@@ -348,10 +377,18 @@ async function extractKeywords() {
             body: JSON.stringify({ text, max_per_category: maxPerCategory })
         });
         let html = '<h3>Ключевые фразы по категориям:</h3>';
-        for (let [cat, phrases] of Object.entries(data.keywords)) {
+        for (let [cat, items] of Object.entries(data.keywords)) {
             html += `<strong>${cat}</strong><ul>`;
-            for (let phrase of phrases) {
-                html += `<li>${phrase}</li>`;
+            for (let item of items) {
+                // item = { phrase, context }
+                const phrase = item.phrase || item; // для обратной совместимости
+                let context = item.context || '';
+                if (context) {
+                    // Экранируем HTML и показываем контекст серым цветом
+                    html += `<li><span style="font-weight:bold;">${escapeHtml(phrase)}</span> <span style="color:#666; font-size:0.9em;">(…${escapeHtml(context)}…)</span></li>`;
+                } else {
+                    html += `<li>${escapeHtml(phrase)}</li>`;
+                }
             }
             html += `</ul>`;
         }
@@ -361,6 +398,13 @@ async function extractKeywords() {
         resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
     }
 }
+
+// Вспомогательная функция для экранирования HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 
 // ========== ВКЛАДКА "АДМИНИСТРИРОВАНИЕ" ==========
 async function addExample() {

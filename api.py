@@ -91,20 +91,81 @@ async def classify(request: TextRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# @app.post("/keywords")
+# async def keywords(request: KeywordsRequest):
+#     try:
+#         async with httpx.AsyncClient(timeout=30.0) as client:
+#             resp = await client.post(
+#                 "http://ai_classifier:8001/extract_keywords",
+#                 json={"text": request.text, "max_per_category": request.max_per_category}
+#             )
+#             if resp.status_code == 200:
+#                 return resp.json()
+#             else:
+#                 raise HTTPException(status_code=resp.status_code, detail="Keyword extraction error")
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/keywords")
 async def keywords(request: KeywordsRequest):
     try:
+        # Вызов ai_classifier
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "http://ai_classifier:8001/extract_keywords",
                 json={"text": request.text, "max_per_category": request.max_per_category}
             )
-            if resp.status_code == 200:
-                return resp.json()
-            else:
+            if resp.status_code != 200:
                 raise HTTPException(status_code=resp.status_code, detail="Keyword extraction error")
+            data = resp.json()
+            keywords = data.get("keywords", {})
+            # Обогащаем каждую фразу контекстом
+            enriched = {}
+            for category, phrases in keywords.items():
+                enriched_phrases = []
+                for phrase in phrases:
+                    context = extract_context_for_phrase(request.text, phrase, window=30)
+                    enriched_phrases.append({"phrase": phrase, "context": context})
+                enriched[category] = enriched_phrases
+            return {"keywords": enriched}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Функция для извлечения контекста
+def extract_context_for_phrase(text: str, phrase: str, window: int = 30) -> str:
+    """
+    Находит первое вхождение фразы (регистронезависимо) в тексте и возвращает
+    фрагмент текста длиной window символов до и после, обрезанный по словам.
+    Если фраза не найдена, возвращает пустую строку.
+    """
+    # Поиск без учёта регистра
+    text_lower = text.lower()
+    phrase_lower = phrase.lower()
+    index = text_lower.find(phrase_lower)
+    if index == -1:
+        return ""
+
+    start = max(0, index - window)
+    end = min(len(text), index + len(phrase) + window)
+
+    # Обрезаем до границ слов (по пробелам)
+    if start > 0:
+        # Ищем первый пробел после start, чтобы не обрезать слово
+        space_after = text.find(' ', start)
+        if space_after != -1 and space_after < index:
+            start = space_after + 1
+    if end < len(text):
+        space_before = text.rfind(' ', 0, end)
+        if space_before != -1 and space_before > index + len(phrase):
+            end = space_before
+
+    context = text[start:end].strip()
+    # Добавляем многоточие, если обрезали
+    if start > 0:
+        context = "..." + context
+    if end < len(text):
+        context = context + "..."
+    return context
 
 def extract_text_with_newspaper(html: str, url: str) -> tuple:
     """Извлечение текста через newspaper3k + резерв BeautifulSoup"""
