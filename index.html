@@ -110,7 +110,10 @@
 </div>
 
 <script>
-// Переключение вкладок
+// ========== БАЗОВЫЙ URL ДЛЯ API (АБСОЛЮТНЫЙ) ==========
+const API_BASE = 'http://186.246.14.209:8000';
+
+// ========== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ==========
 function openTab(evt, tabName) {
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("tabcontent");
@@ -160,13 +163,12 @@ async function analyzeSingle() {
     const resultDiv = document.getElementById('singleResult');
     resultDiv.innerHTML = 'Анализ...';
     try {
-        const data = await handleFetch('/classify', {
+        const data = await handleFetch(API_BASE + '/classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text })
         });
         resultDiv.innerHTML = `<pre>${data.result}</pre>`;
-        // Сохраняем сырые данные для экспорта
         window._singleData = data;
     } catch (error) {
         resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
@@ -181,15 +183,13 @@ function exportSingleJSON() {
 function exportSingleCSV() {
     if (!window._singleData) { alert('Сначала выполните анализ.'); return; }
     const resultStr = window._singleData.result;
-    const lines = resultStr.split('\n').filter(l => l.trim());
-    // Простой CSV: первая строка "Результат", вторая - весь текст
     const csv = 'Результат\n"' + resultStr.replace(/"/g, '""') + '"';
     downloadFile(csv, 'single_result.csv', 'text/csv');
 }
 
 // ========== ВКЛАДКА "АНАЛИЗ САЙТОВ" ==========
 let sitesEventSource = null;
-let sitesRawData = null; // для экспорта
+let sitesRawData = [];
 
 async function analyzeSites() {
     const urlsText = document.getElementById('urls').value;
@@ -199,7 +199,6 @@ async function analyzeSites() {
         document.getElementById('sitesResult').innerHTML = '<span class="error">Введите хотя бы один URL.</span>';
         return;
     }
-    // Валидация URL
     for (let u of urls) {
         try { new URL(u); } catch(e) {
             document.getElementById('sitesResult').innerHTML = `<span class="error">Некорректный URL: ${u}</span>`;
@@ -217,24 +216,18 @@ async function analyzeSites() {
     progressStatus.textContent = 'Подключение...';
     resultDiv.innerHTML = '';
 
-    // Закрываем предыдущий EventSource, если есть
     if (sitesEventSource) {
         sitesEventSource.close();
         sitesEventSource = null;
     }
 
-    // Формируем URL с параметрами (GET)
     const params = new URLSearchParams();
     urls.forEach(u => params.append('urls', u));
     params.append('max_articles_per_site', maxArticles);
-    const eventUrl = '/analyze_sites_stream?' + params.toString();
+    const eventUrl = API_BASE + '/analyze_sites_stream?' + params.toString();
 
     sitesEventSource = new EventSource(eventUrl);
-    sitesRawData = []; // собираем данные для экспорта
-
-    sitesEventSource.onmessage = function(event) {
-        // общее сообщение (не используется)
-    };
+    sitesRawData = [];
 
     sitesEventSource.addEventListener('start', function(e) {
         const data = JSON.parse(e.data);
@@ -253,23 +246,19 @@ async function analyzeSites() {
 
     sitesEventSource.addEventListener('site_done', function(e) {
         const data = JSON.parse(e.data);
-        // Сохраняем результат сайта для экспорта
         sitesRawData.push(data);
-        // Обновляем прогресс-бар (грубо – по количеству завершённых сайтов)
         const total = sitesRawData.length;
         const all = parseInt(progressStatus.textContent.match(/обработку (\d+)/)?.[1] || total);
         const percent = Math.min(100, Math.round((total / all) * 100));
         progressBar.style.width = percent + '%';
         progressBar.textContent = percent + '%';
         progressStatus.textContent = `Завершён сайт ${data.url}`;
-        // Отображаем промежуточный результат
         appendSiteResult(data);
     });
 
     sitesEventSource.addEventListener('site_error', function(e) {
         const data = JSON.parse(e.data);
         progressStatus.textContent = `Ошибка на сайте ${data.url}: ${data.error}`;
-        // Можно добавить в результат
         resultDiv.innerHTML += `<div class="error"><strong>${data.url}</strong>: ${data.error}</div>`;
     });
 
@@ -279,8 +268,6 @@ async function analyzeSites() {
         progressBar.style.width = '100%';
         progressBar.textContent = '100%';
         progressStatus.textContent = 'Анализ завершён!';
-        // Добавляем общий итог (можно не добавлять, т.к. уже есть по сайтам)
-        // Сохраняем все данные в window._sitesData для экспорта
         window._sitesData = sitesRawData;
     });
 
@@ -325,7 +312,6 @@ function exportSitesJSON() {
 
 function exportSitesCSV() {
     if (!window._sitesData) { alert('Сначала выполните анализ сайтов.'); return; }
-    // Нормализуем: одна строка = одна статья
     const rows = [['Сайт', 'URL статьи', 'Превью', 'Категория', 'Процент', 'Уверенность']];
     for (let site of window._sitesData) {
         for (let art of site.articles) {
@@ -356,7 +342,7 @@ async function extractKeywords() {
     const resultDiv = document.getElementById('keywordsResult');
     resultDiv.innerHTML = 'Извлечение...';
     try {
-        const data = await handleFetch('/keywords', {
+        const data = await handleFetch(API_BASE + '/keywords', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, max_per_category: maxPerCategory })
@@ -388,7 +374,7 @@ async function addExample() {
     resultDiv.innerHTML = 'Отправка...';
     try {
         const auth = btoa('admin:admin123');
-        const data = await handleFetch('/admin/add_example', {
+        const data = await handleFetch(API_BASE + '/admin/add_example', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -403,7 +389,7 @@ async function addExample() {
     }
 }
 
-// ========== ОБЩИЕ ФУНКЦИИ ДЛЯ СКАЧИВАНИЯ ==========
+// ========== ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ СКАЧИВАНИЯ ==========
 function downloadFile(content, filename, mimeType) {
     const blob = new Blob([content], { type: mimeType });
     const link = document.createElement('a');
