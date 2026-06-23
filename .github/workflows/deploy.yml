@@ -46,9 +46,26 @@ jobs:
           script: |
             cd /opt/ai-agent
             docker-compose down
+            # Предварительно скачиваем тяжёлый базовый образ для browser
+            docker pull mcr.microsoft.com/playwright/python:v1.46.0-jammy || true
             docker-compose pull
             docker-compose up -d --build
             docker image prune -f
+          # Опционально: увеличить общий таймаут для скрипта (в секундах)
+          timeout: 1800s   # 30 минут          
+            
+      # - name: Restart Docker containers
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.TIMEWEB_HOST }}
+      #     username: root
+      #     key: ${{ secrets.TIMEWEB_SSH_KEY }}
+      #     script: |
+      #       cd /opt/ai-agent
+      #       docker-compose down
+      #       docker-compose pull
+      #       docker-compose up -d --build
+      #       docker image prune -f
       
       # - name: Run API tests
       #   run: |
