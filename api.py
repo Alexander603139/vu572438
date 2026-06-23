@@ -400,46 +400,76 @@ async def analyze_sites(request: SitesRequest):
 
 async def analyze_sites_generator(urls: List[str], max_articles_per_site: int):
     """Генератор для SSE-потока прогресса анализа сайтов"""
-    yield f"event: start\ndata: {json.dumps({'total': len(urls)})}\n\n"
+    yield "event: start\ndata: " + json.dumps({'total': len(urls)}) + "\n\n"
     
     for idx, site in enumerate(urls):
-        yield f"event: site_start\ndata: {json.dumps({'url': site, 'index': idx})}\n\n"
+        yield "event: site_start\ndata: " + json.dumps({'url': site, 'index': idx}) + "\n\n"
         articles_data = await fetch_site_articles(site, max_articles_per_site)
         if not articles_data:
-            yield f"event: site_error\ndata: {json.dumps({'url': site, 'error': 'Не найдено статей'})}\n\n"
+            yield "event: site_error\ndata: " + json.dumps({'url': site, 'error': 'Не найдено статей'}) + "\n\n"
             continue
         
         site_results = []
         for art in articles_data:
-            # ... (классификация каждой статьи, как в старом методе) ...
-            # формируем результат для статьи
+            text = art["text"]
+            preview = art["preview"]
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        "http://ai_classifier:8001/classify", json={"text": text}
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        output = data.get("result", "")
+                    else:
+                        output = ""
+            except Exception as e:
+                logger.error(f"YandexGPT error for {art['url']}: {e}")
+                output = ""
+            
+            dist = {}
+            confidence = 0.0
+            for line in output.split("\n"):
+                if ":" in line and "%" in line:
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        cat = parts[0].strip()
+                        try:
+                            percent = float(parts[1].replace("%", "").strip())
+                            dist[cat] = percent
+                        except:
+                            pass
+                elif "Уверенность ИИ:" in line:
+                    try:
+                        confidence = float(line.split(":")[1].strip())
+                    except:
+                        confidence = 0.0
+            
             site_results.append({
                 "url": art["url"],
-                "preview": art["preview"],
+                "preview": preview,
                 "distribution": dist,
                 "confidence": confidence
             })
-            # опционально отправляем событие о каждой статье
-            yield f"event: article\ndata: {json.dumps({'url': art['url']})}\n\n"
+            yield "event: article\ndata: " + json.dumps({'url': art['url']}) + "\n\n"
         
-        # после обработки всех статей сайта – отправляем итог по сайту
         total_counts = defaultdict(int)
         for r in site_results:
             for cat, val in r["distribution"].items():
                 total_counts[cat] += val
         total = sum(total_counts.values()) or 1
         norm = {cat: round(val/total*100, 1) for cat, val in total_counts.items()}
-        avg_conf = round(sum(r.get("confidence",0) for r in site_results)/len(site_results), 2) if site_results else 0.0
+        avg_conf = round(sum(r.get("confidence", 0) for r in site_results) / len(site_results), 2) if site_results else 0.0
         
-        yield f"event: site_done\ndata: {json.dumps({
+        yield "event: site_done\ndata: " + json.dumps({
             'url': site,
             'articles': site_results,
             'distribution': norm,
             'avg_confidence': avg_conf,
             'articles_parsed': len(site_results)
-        })}\n\n"
+        }) + "\n\n"
     
-    yield f"event: done\ndata: {json.dumps({'status': 'ok'})}\n\n"
+    yield "event: done\ndata: " + json.dumps({'status': 'ok'}) + "\n\n"
 
 @app.get("/analyze_sites_stream")
 async def analyze_sites_stream(urls: List[str], max_articles_per_site: int = 5):
