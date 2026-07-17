@@ -72,6 +72,15 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Unauthorized")
     return True
 
+
+# проверять длину текста (≥ 10 символов) и долю букв (например, > 50%) – отсечёт случайные символы
+def is_meaningful(text: str) -> bool:
+    text = text.strip()
+    if len(text) < 10:
+        return False
+    letter_count = sum(c.isalpha() for c in text)
+    return letter_count / len(text) > 0.5
+
 @app.post("/admin/add_example")
 async def admin_add_example(request: AddExampleRequest, auth: bool = Depends(verify_admin)):
     await add_example_to_yaml_and_redis(request.category, request.text)
@@ -79,6 +88,8 @@ async def admin_add_example(request: AddExampleRequest, auth: bool = Depends(ver
 
 @app.post("/classify")
 async def classify(request: TextRequest):
+    if not is_meaningful(request.text):
+        raise HTTPException(status_code=400, detail="Текст слишком короткий или содержит мало букв")
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
@@ -108,6 +119,8 @@ async def classify(request: TextRequest):
 
 @app.post("/keywords")
 async def keywords(request: KeywordsRequest):
+    if not is_meaningful(request.text):
+        raise HTTPException(status_code=400, detail="Текст слишком короткий или содержит мало букв")
     try:
         # Вызов ai_classifier
         async with httpx.AsyncClient(timeout=30.0) as client:

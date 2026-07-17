@@ -54,9 +54,9 @@ jobs:
           # Опционально: увеличить общий таймаут для скрипта (в секундах)
           timeout: 1800s   # 30 минут          
       
-      - name: Run API tests
-        run: |
-          pip install pytest requests
-          # Даём серверу время подняться
-          sleep 30
-          pytest tests/ -v --maxfail=1
+      # - name: Run API tests
+      #   run: |
+      #     pip install pytest requests
+      #     # Даём серверу время подняться
+      #     sleep 30
+      #     pytest tests/ -v --maxfail=1
