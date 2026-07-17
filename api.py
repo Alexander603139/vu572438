@@ -8,6 +8,9 @@ from pathlib import Path
 import re
 import subprocess
 import uvicorn
+from pydantic import BaseModel
+from typing import Dict, List
+from urllib.parse import urljoin
 
 # Сторонние библиотеки
 from bs4 import BeautifulSoup
@@ -30,8 +33,6 @@ from fastapi.security import (
     HTTPBasic,
     HTTPBasicCredentials,
 )
-from pydantic import BaseModel
-from typing import Dict, List
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -301,6 +302,10 @@ async def fetch_site_articles(site_url: str, max_articles: int):
         site_url.rstrip("/") + "/feed.xml",
         site_url.rstrip("/") + "/news/rss",
     ]
+    
+    if not site_url.endswith('/'):
+        site_url = site_url + '/'
+
     for rss in rss_urls:
         articles = await fetch_rss_feed(rss, max_articles)
         if articles:
