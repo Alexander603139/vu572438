@@ -68,6 +68,10 @@ class AddExampleRequest(BaseModel):
     category: str
     text: str
 
+class UpdateExamplesRequest(BaseModel):
+    category: str
+    examples: List[str]
+
 def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
     if credentials.username != ADMIN_USER or credentials.password != ADMIN_PASS:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -82,10 +86,10 @@ def is_meaningful(text: str) -> bool:
     letter_count = sum(c.isalpha() for c in text)
     return letter_count / len(text) > 0.5
 
-@app.post("/admin/add_example")
-async def admin_add_example(request: AddExampleRequest, auth: bool = Depends(verify_admin)):
-    await add_example_to_yaml_and_redis(request.category, request.text)
-    return {"status": "ok"}
+# @app.post("/admin/add_example")
+# async def admin_add_example(request: AddExampleRequest, auth: bool = Depends(verify_admin)):
+#     await add_example_to_yaml_and_redis(request.category, request.text)
+#     return {"status": "ok"}
 
 @app.post("/classify")
 async def classify(request: TextRequest):
@@ -551,6 +555,95 @@ async def analyze_sites_generator(urls: List[str], max_articles_per_site: int):
         }) + "\n\n"
     
     yield "event: done\ndata: " + json.dumps({'status': 'ok'}) + "\n\n"
+
+# Новый эндпоинт: получить примеры для категории
+@app.get("/admin/get_examples")
+async def admin_get_examples(category: str, auth: bool = Depends(verify_admin)):
+    """
+    Возвращает список примеров для указанной категории из YAML-файла.
+    category: economic_left, economic_right, social_liberal, social_authoritarian
+    """
+    # Маппинг категорий на имена файлов (как в add_example_to_yaml_and_redis)
+    filename_map = {
+        "economic_left": "economic_left.yml",
+        "economic_right": "economic_right.yml",
+        "social_liberal": "social_liberal.yml",
+        "social_authoritarian": "social_authoritarian.yml",
+    }
+    if category not in filename_map:
+        raise HTTPException(status_code=400, detail="Недопустимая категория")
+
+    filepath = Path("/app/samples") / filename_map[category]
+    if not filepath.exists():
+        # Если файла нет, возвращаем пустой список
+        return {"examples": []}
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            examples = yaml.safe_load(f) or []
+        return {"examples": examples}
+    except Exception as e:
+        logger.error(f"Ошибка чтения {filepath}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка чтения файла примеров")
+    
+# Новый эндпоинт: обновить (перезаписать) примеры для категории
+@app.post("/admin/update_examples")
+async def admin_update_examples(request: AddExampleRequest, auth: bool = Depends(verify_admin)):
+    """
+    Принимает category и список examples (текст). Перезаписывает YAML-файл 
+    и вызывает перезагрузку samples в ai_classifier.
+    Используем ту же схему AddExampleRequest, но добавим поле examples.
+    """
+    category = request.category
+    examples = request.examples
+    
+    try:
+        body = await request.json()
+        category = body.get("category")
+        examples = body.get("examples", [])
+    except:
+        raise HTTPException(status_code=400, detail="Неверный формат JSON")
+
+    # Проверка категории
+    filename_map = {
+        "economic_left": "economic_left.yml",
+        "economic_right": "economic_right.yml",
+        "social_liberal": "social_liberal.yml",
+        "social_authoritarian": "social_authoritarian.yml",
+    }
+    if category not in filename_map:
+        raise HTTPException(status_code=400, detail="Недопустимая категория")
+
+    filepath = Path("/app/samples") / filename_map[category]
+    # Убедимся, что examples - список строк, удалим пустые
+    if not isinstance(examples, list):
+        raise HTTPException(status_code=400, detail="examples должен быть списком")
+    clean_examples = [ex.strip() for ex in examples if ex.strip()]
+
+    # Сохраняем в YAML
+    try:
+        # Создаём временный файл для атомарной записи
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, dir=filepath.parent) as tmp:
+            yaml.dump(clean_examples, tmp, allow_unicode=True, default_flow_style=False)
+            tmp_path = tmp.name
+        # Перемещаем временный файл на место оригинального
+        import shutil
+        shutil.move(tmp_path, filepath)
+        logger.info(f"Обновлён файл {filepath}, записано {len(clean_examples)} примеров")
+    except Exception as e:
+        logger.error(f"Ошибка записи {filepath}: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка сохранения файла примеров")
+
+    # Вызываем перезагрузку в ai_classifier
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post("http://ai_classifier:8001/admin/reload_samples")
+    except Exception as e:
+        logger.error(f"Ошибка вызова reload_samples: {e}")
+        # Не фатально, но сообщим пользователю
+        # Можно вернуть предупреждение, но пока просто лог
+
+    return {"status": "ok", "updated": len(clean_examples)}
 
 @app.get("/analyze_sites_stream")
 async def analyze_sites_stream(urls: List[str] = Query(...), max_articles_per_site: int = 5):

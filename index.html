@@ -90,7 +90,7 @@
 </div>
 
 <!-- Вкладка 4: администрирование -->
-<div id="Admin" class="tabcontent">
+<!-- <div id="Admin" class="tabcontent">
     <h3>Добавление few-shot примера</h3>
     <label>Категория:</label>
     <select id="exampleCategory">
@@ -106,6 +106,28 @@
     <div class="flex">
         <button onclick="addExample()">Добавить пример</button>
         <button class="btn-clear" onclick="document.getElementById('exampleText').value=''; document.getElementById('adminResult').innerHTML='';">Очистить</button>
+    </div>
+    <div id="adminResult" style="margin-top: 20px;"></div>
+</div> -->
+
+<!-- Вкладка 4: администрирование -->
+<div id="Admin" class="tabcontent">
+    <h3>Редактирование few-shot примеров</h3>
+    <label>Категория:</label>
+    <select id="exampleCategory">
+        <option value="economic_left">Экономические левые</option>
+        <option value="economic_right">Экономические правые</option>
+        <option value="social_liberal">Социально-либертарные</option>
+        <option value="social_authoritarian">Социально-авторитарные</option>
+    </select>
+    <br><br>
+    <label>Список примеров (по одному на строку):</label><br>
+    <textarea id="exampleList" rows="10" cols="60" placeholder="Каждый пример с новой строки..."></textarea>
+    <br>
+    <div class="flex">
+        <button onclick="getExamples()">Получить</button>
+        <button onclick="saveExamples()">Сохранить</button>
+        <button class="btn-clear" onclick="document.getElementById('exampleList').value=''; document.getElementById('adminResult').innerHTML='';">Очистить</button>
     </div>
     <div id="adminResult" style="margin-top: 20px;"></div>
 </div>
@@ -370,6 +392,7 @@ function exportSitesCSV() {
 //         resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
 //     }
 // }
+
 async function extractKeywords() {
     const text = document.getElementById('keywordsText').value.trim();
     if (!text) {
@@ -416,27 +439,78 @@ function escapeHtml(text) {
 
 
 // ========== ВКЛАДКА "АДМИНИСТРИРОВАНИЕ" ==========
-async function addExample() {
+// async function addExample() {
+//     const category = document.getElementById('exampleCategory').value;
+//     const text = document.getElementById('exampleText').value.trim();
+//     if (!text) {
+//         document.getElementById('adminResult').innerHTML = '<span class="error">Введите текст примера.</span>';
+//         return;
+//     }
+//     const resultDiv = document.getElementById('adminResult');
+//     resultDiv.innerHTML = 'Отправка...';
+//     try {
+//         const auth = btoa('admin:admin123');
+//         const data = await handleFetch(API_BASE + '/admin/add_example', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'Authorization': `Basic ${auth}`
+//             },
+//             body: JSON.stringify({ category, text })
+//         });
+//         resultDiv.innerHTML = '<span style="color:green;">Пример успешно добавлен!</span>';
+//         document.getElementById('exampleText').value = '';
+//     } catch (error) {
+//         resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
+//     }
+// }
+// ========== ВКЛАДКА "АДМИНИСТРИРОВАНИЕ" ==========
+async function getExamples() {
     const category = document.getElementById('exampleCategory').value;
-    const text = document.getElementById('exampleText').value.trim();
-    if (!text) {
-        document.getElementById('adminResult').innerHTML = '<span class="error">Введите текст примера.</span>';
-        return;
-    }
     const resultDiv = document.getElementById('adminResult');
-    resultDiv.innerHTML = 'Отправка...';
+    const textarea = document.getElementById('exampleList');
+    resultDiv.innerHTML = 'Загрузка...';
     try {
         const auth = btoa('admin:admin123');
-        const data = await handleFetch(API_BASE + '/admin/add_example', {
+        const data = await handleFetch(API_BASE + `/admin/get_examples?category=${encodeURIComponent(category)}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Basic ${auth}`
+            }
+        });
+        // data.examples - массив строк
+        textarea.value = (data.examples || []).join('\n');
+        resultDiv.innerHTML = `<span style="color:green;">Загружено ${data.examples ? data.examples.length : 0} примеров.</span>`;
+    } catch (error) {
+        resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
+    }
+}
+
+async function saveExamples() {
+    const category = document.getElementById('exampleCategory').value;
+    const textarea = document.getElementById('exampleList');
+    const resultDiv = document.getElementById('adminResult');
+    const raw = textarea.value;
+    // Разбиваем по строкам, убираем пустые и обрезаем
+    const examples = raw.split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+    if (examples.length === 0) {
+        resultDiv.innerHTML = '<span class="error">Список примеров не может быть пустым.</span>';
+        return;
+    }
+    resultDiv.innerHTML = 'Сохранение...';
+    try {
+        const auth = btoa('admin:admin123');
+        const data = await handleFetch(API_BASE + '/admin/update_examples', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Basic ${auth}`
             },
-            body: JSON.stringify({ category, text })
+            body: JSON.stringify({ category, examples })
         });
-        resultDiv.innerHTML = '<span style="color:green;">Пример успешно добавлен!</span>';
-        document.getElementById('exampleText').value = '';
+        resultDiv.innerHTML = `<span style="color:green;">Сохранено ${data.updated} примеров. Кэш обновлён.</span>`;
     } catch (error) {
         resultDiv.innerHTML = `<span class="error">${error.message}</span>`;
     }
