@@ -587,21 +587,13 @@ async def admin_get_examples(category: str, auth: bool = Depends(verify_admin)):
     
 # Новый эндпоинт: обновить (перезаписать) примеры для категории
 @app.post("/admin/update_examples")
-async def admin_update_examples(request: AddExampleRequest, auth: bool = Depends(verify_admin)):
+async def admin_update_examples(request: UpdateExamplesRequest, auth: bool = Depends(verify_admin)):
     """
     Принимает category и список examples (текст). Перезаписывает YAML-файл 
     и вызывает перезагрузку samples в ai_classifier.
-    Используем ту же схему AddExampleRequest, но добавим поле examples.
     """
     category = request.category
     examples = request.examples
-    
-    try:
-        body = await request.json()
-        category = body.get("category")
-        examples = body.get("examples", [])
-    except:
-        raise HTTPException(status_code=400, detail="Неверный формат JSON")
 
     # Проверка категории
     filename_map = {
@@ -613,21 +605,18 @@ async def admin_update_examples(request: AddExampleRequest, auth: bool = Depends
     if category not in filename_map:
         raise HTTPException(status_code=400, detail="Недопустимая категория")
 
-    filepath = Path("/app/samples") / filename_map[category]
-    # Убедимся, что examples - список строк, удалим пустые
-    if not isinstance(examples, list):
-        raise HTTPException(status_code=400, detail="examples должен быть списком")
+    # Очистка списка (удаляем пустые строки)
     clean_examples = [ex.strip() for ex in examples if ex.strip()]
 
+    filepath = Path("/app/samples") / filename_map[category]
     # Сохраняем в YAML
     try:
         # Создаём временный файл для атомарной записи
         import tempfile
+        import shutil
         with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False, dir=filepath.parent) as tmp:
             yaml.dump(clean_examples, tmp, allow_unicode=True, default_flow_style=False)
             tmp_path = tmp.name
-        # Перемещаем временный файл на место оригинального
-        import shutil
         shutil.move(tmp_path, filepath)
         logger.info(f"Обновлён файл {filepath}, записано {len(clean_examples)} примеров")
     except Exception as e:
@@ -641,7 +630,6 @@ async def admin_update_examples(request: AddExampleRequest, auth: bool = Depends
     except Exception as e:
         logger.error(f"Ошибка вызова reload_samples: {e}")
         # Не фатально, но сообщим пользователю
-        # Можно вернуть предупреждение, но пока просто лог
 
     return {"status": "ok", "updated": len(clean_examples)}
 
