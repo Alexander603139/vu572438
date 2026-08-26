@@ -87,7 +87,7 @@ services:
     container_name: ai_classifier
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - "8010:8001"
     volumes:
       - ./political_markers.yml:/app/political_markers.yml:ro
       - ./samples:/app/samples:ro
@@ -107,6 +107,6 @@ services:
     container_name: ai-agent-browser
     restart: unless-stopped
     ports:
-      - "8002:8002"
+      - "8011:8002"
     networks:
       - monitoring
