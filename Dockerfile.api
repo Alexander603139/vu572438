@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY api.py telegram_parser.py classifier.py political_markers.yml ./
+COPY api.py classifier.py political_markers.yml ./
 RUN pip install --upgrade pip 
 
 EXPOSE 8000
