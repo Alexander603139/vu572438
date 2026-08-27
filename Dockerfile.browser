@@ -15,7 +15,6 @@ COPY requirements.browser.txt .
 RUN pip install --no-cache-dir -r requirements.browser.txt
 
 # Установка браузера Chromium с кэшированием в отдельный слой
-
 RUN playwright install chromium && playwright install-deps
 
 # Копируем код
